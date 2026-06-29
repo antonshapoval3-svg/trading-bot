@@ -26,7 +26,6 @@ async function sendTelegram(text){
       {chat_id:TG_CHAT,text,parse_mode:"Markdown"});
   }catch(e){ console.error("Telegram error:",e.response?.data||e.message); }
 }
-
 async function sendMorningBriefing(){
   const today=new Date().toLocaleDateString("fr-FR",{weekday:"long",year:"numeric",month:"long",day:"numeric"});
   console.log("Briefing du "+today+"...");
@@ -35,20 +34,80 @@ async function sendMorningBriefing(){
       model:"claude-sonnet-4-6",
       max_tokens:2048,
       tools:[{type:"web_search_20250305",name:"web_search"}],
-      messages:[{role:"user",content:"Tu es un analyste de trading professionnel. Aujourd'hui c'est le "+today+".\n\nRecherche sur le web les informations du jour sur GOLD et DAX, puis genere ce briefing en francais :\n\n* BRIEFING MATINAL - "+today+" *\n\n--- GOLD (XAU/USD) ---\nPrix actuel : [prix]\nTendance : [haussiere/baissiere/neutre]\nZones cles :\n- Resistances : [niveaux]\n- Supports : [niveaux]\nSens du trade : [LONG/SHORT/NEUTRE]\nConfluence : [raisons]\nRisques : [risques]\n\n--- DAX (GER40) ---\nPrix actuel : [prix]\nTendance : [haussiere/baissiere/neutre]\nZones cles :\n- Resistances : [niveaux]\n- Supports : [niveaux]\nSens du trade : [LONG/SHORT/NEUTRE]\nConfluence : [raisons]\nRisques : [risques]\n\n--- AGENDA ECONOMIQUE ---\n[annonces importantes du jour avec heure et impact]\n\n--- NEWS IMPORTANTES ---\n[2-3 news cles du jour]\n\n--- RESUME STRATEGIQUE ---\n[synthese et strategie globale du jour]\n\nBriefing genere par Claude AI"}]
+      messages:[{role:"user",content:`Tu es un analyste de trading. Aujourd'hui c'est le ${today}.
+
+IMPORTANT : Recherche d'abord sur le web le prix actuel du GOLD et du DAX maintenant, les news du jour, et le calendrier economique.
+
+Ensuite reponds UNIQUEMENT avec ce format exact pour Telegram (utilise * pour le gras, pas de # ou ##) :
+
+🌅 *BRIEFING — ${today}*
+
+━━━━━━━━━━━━━━━
+🥇 *GOLD (XAU/USD)*
+━━━━━━━━━━━━━━━
+💰 Prix : [METS LE VRAI PRIX ICI]
+📈 Tendance : [haussiere/baissiere/neutre]
+🎯 Resistance : [niveau] | Support : [niveau]
+💡 Trade : [LONG / SHORT / NEUTRE]
+⚠️ Risque : [risque principal]
+
+━━━━━━━━━━━━━━━
+📈 *DAX (GER40)*
+━━━━━━━━━━━━━━━
+💰 Prix : [METS LE VRAI PRIX ICI]
+📈 Tendance : [haussiere/baissiere/neutre]
+🎯 Resistance : [niveau] | Support : [niveau]
+💡 Trade : [LONG / SHORT / NEUTRE]
+⚠️ Risque : [risque principal]
+
+━━━━━━━━━━━━━━━
+📅 *AGENDA DU JOUR*
+━━━━━━━━━━━━━━━
+[heure] - [annonce] - [impact H/M/L]
+[heure] - [annonce] - [impact H/M/L]
+
+━━━━━━━━━━━━━━━
+📰 *NEWS CLES*
+━━━━━━━━━━━━━━━
+• [news 1]
+• [news 2]
+• [news 3]
+
+━━━━━━━━━━━━━━━
+🧠 *STRATEGIE DU JOUR*
+━━━━━━━━━━━━━━━
+[2-3 phrases de synthese]
+
+_Claude AI Trading_`}]
     },{headers:{"x-api-key":ANTHROPIC_KEY,"anthropic-version":"2023-06-01","content-type":"application/json"}});
+
     const txt=res.data.content.find(b=>b.type==="text")?.text||"Erreur contenu";
-    if(txt.length>4000){
-      const mid=txt.lastIndexOf("\n",4000);
-      await sendTelegram(txt.substring(0,mid));
-      await sendTelegram(txt.substring(mid));
-    } else { await sendTelegram(txt); }
+    console.log("Briefing genere - longueur:",txt.length);
+
+    // Envoie en plusieurs messages si trop long
+    if(txt.length>3800){
+      const parts=[];
+      let remaining=txt;
+      while(remaining.length>0){
+        let cut=remaining.lastIndexOf("\n",3800);
+        if(cut<=0) cut=3800;
+        parts.push(remaining.substring(0,cut));
+        remaining=remaining.substring(cut).trim();
+      }
+      for(const part of parts){
+        await sendTelegram(part);
+        await new Promise(r=>setTimeout(r,500));
+      }
+    } else {
+      await sendTelegram(txt);
+    }
     console.log("Briefing envoye !");
   }catch(e){
     console.error("Briefing error:",e.response?.data||e.message);
-    await sendTelegram("Erreur generation briefing matinal.");
+    await sendTelegram("Erreur generation briefing matinal: "+e.message);
   }
 }
+
 
 function scheduleBriefing(){
   const now=new Date();
