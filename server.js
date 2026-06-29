@@ -3,6 +3,8 @@ const express = require("express");
 const axios   = require("axios");
 const app     = express();
 app.use(express.json());
+const path = require("path");
+app.use(express.static(__dirname));
 
 // ─── Clés depuis le fichier .env ─────────────────────────────
 const ANTHROPIC_KEY   = process.env.ANTHROPIC_API_KEY;
