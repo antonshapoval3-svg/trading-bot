@@ -210,7 +210,9 @@ tr:hover td{background:#fafaf8}
       <div class="field"><label>Date</label><input id="f-date" type="date"></div>
       <div class="field"><label>Prix entree</label><input id="f-entry" type="number" placeholder="0.00" step="any"></div>
       <div class="field"><label>Stop-Loss</label><input id="f-sl" type="number" placeholder="0.00" step="any"></div>
-      <div class="field"><label>Take-Profit</label><input id="f-tp" type="number" placeholder="0.00" step="any"></div>
+      <div class="field"><label>TP1</label><input id="f-tp" type="number" placeholder="0.00" step="any"></div>
+      <div class="field"><label>TP2</label><input id="f-tp2" type="number" placeholder="0.00" step="any"></div>
+      <div class="field"><label>Break Even (BE)</label><input id="f-be" type="number" placeholder="0.00" step="any"></div>
       <div class="field"><label>Taille (lots)</label><input id="f-size" type="number" placeholder="1" step="any"></div>
       <div class="field"><label>Statut</label><select id="f-status"><option value="open">Ouvert</option><option value="closed">Ferme</option></select></div>
       <div class="field"><label>Prix sortie</label><input id="f-exit" type="number" placeholder="0.00" step="any"></div>
@@ -251,7 +253,7 @@ tr:hover td{background:#fafaf8}
     </div>
   </div>
   <div class="section" style="padding:0;overflow:auto">
-    <table><thead><tr><th>Date</th><th>Actif</th><th>Dir.</th><th>Entree</th><th>Sortie</th><th>SL</th><th>TP</th><th>Taille</th><th>P&amp;L</th><th>Net P&amp;L</th><th>Statut</th><th>Strat.</th><th>Emotion</th><th>Notes</th><th></th></tr></thead><tbody id="trades-body"></tbody></table>
+    <table><thead><tr><th>Date</th><th>Actif</th><th>Dir.</th><th>Entree</th><th>Sortie</th><th>SL</th><th>TP1</th><th>TP2</th><th>BE</th><th>Taille</th><th>P&amp;L</th><th>Net P&amp;L</th><th>Statut</th><th>Strat.</th><th>Notes</th><th></th></tr></thead><tbody id="trades-body"></tbody></table>
   </div>
 </div>
 <div id="page-notes" class="page">
@@ -401,7 +403,7 @@ function saveTrade(){
   var symbol=(document.getElementById('f-symbol').value||'').toUpperCase().trim();
   if(!symbol){alert('Entre un actif !');return;}
   var pnl=parseFloat(document.getElementById('f-pnl').value)||0;
-  var t={id:Date.now(),symbol:symbol,side:document.getElementById('f-side').value,date:document.getElementById('f-date').value,entry:parseFloat(document.getElementById('f-entry').value)||0,sl:parseFloat(document.getElementById('f-sl').value)||0,tp:parseFloat(document.getElementById('f-tp').value)||0,size:parseFloat(document.getElementById('f-size').value)||1,status:document.getElementById('f-status').value,exit:parseFloat(document.getElementById('f-exit').value)||0,pnl:pnl,netPnl:pnl-COMMISSION,strategy:document.getElementById('f-strategy').value,emotion:document.getElementById('f-emotion').value,notes:document.getElementById('f-notes').value};
+  var t={id:Date.now(),symbol:symbol,side:document.getElementById('f-side').value,date:document.getElementById('f-date').value,entry:parseFloat(document.getElementById('f-entry').value)||0,sl:parseFloat(document.getElementById('f-sl').value)||0,tp:parseFloat(document.getElementById('f-tp').value)||0,tp2:parseFloat(document.getElementById('f-tp2').value)||0,be:parseFloat(document.getElementById('f-be').value)||0,size:parseFloat(document.getElementById('f-size').value)||1,status:document.getElementById('f-status').value,exit:parseFloat(document.getElementById('f-exit').value)||0,pnl:pnl,netPnl:pnl-COMMISSION,strategy:document.getElementById('f-strategy').value,emotion:document.getElementById('f-emotion').value,notes:document.getElementById('f-notes').value};
   var photo = getPhotoData('f-photo-img');
   if(photo) t.photo = photo;
   trades.unshift(t);save();updateCount();clearForm();showPage('trades');
@@ -412,6 +414,7 @@ function clearForm(){
   document.getElementById('f-side').value='BUY';
   document.getElementById('f-status').value='open';
   removePhoto('f-photo','f-photo-preview','f-photo-img');
+  ['f-tp2','f-be'].forEach(function(id){document.getElementById(id).value='';});
 }
 function filterTrades(mode,btn){filterMode=mode;document.querySelectorAll('.filter-btn').forEach(function(b){b.classList.remove('active');});btn.classList.add('active');renderTrades();}
 function renderTrades(){
@@ -459,6 +462,57 @@ function confirmClose(){
 function saveNote(){var txt=document.getElementById('note-input').value.trim();if(!txt)return;notes.unshift({id:Date.now(),text:txt,date:new Date().toLocaleDateString('fr-FR')});save();document.getElementById('note-input').value='';renderNotes();}
 function renderNotes(){var el=document.getElementById('notes-list');if(!notes.length){el.innerHTML='<p class="empty">Aucune note</p>';return;}el.innerHTML=notes.map(function(n){return'<div class="note-card">'+n.text+'<div class="note-date">'+n.date+' <button onclick="deleteNote('+n.id+')" style="border:none;background:none;color:#e34948;cursor:pointer;font-size:11px;margin-left:8px"><i class="ti ti-trash"></i></button></div></div>';}).join('');}
 function deleteNote(id){notes=notes.filter(function(n){return n.id!==id;});save();renderNotes();}
+
+
+// ─── MODIFIER TRADE ───────────────────────────────────────────────
+function openEditModal(id){
+  var t=trades.find(function(t){return t.id===id;});
+  if(!t)return;
+  document.getElementById('edit-id').value=id;
+  document.getElementById('edit-symbol').value=t.symbol||'';
+  document.getElementById('edit-side').value=t.side||'BUY';
+  document.getElementById('edit-date').value=t.date||'';
+  document.getElementById('edit-entry').value=t.entry||'';
+  document.getElementById('edit-sl').value=t.sl||'';
+  document.getElementById('edit-tp').value=t.tp||'';
+  document.getElementById('edit-tp2').value=t.tp2||'';
+  document.getElementById('edit-be').value=t.be||'';
+  document.getElementById('edit-size').value=t.size||1;
+  document.getElementById('edit-status').value=t.status||'open';
+  document.getElementById('edit-exit').value=t.exit||'';
+  document.getElementById('edit-pnl').value=t.pnl||'';
+  document.getElementById('edit-strategy').value=t.strategy||'EMA + VWAP';
+  document.getElementById('edit-emotion').value=t.emotion||'Neutre';
+  document.getElementById('edit-notes').value=t.notes||'';
+  document.getElementById('edit-modal').classList.add('show');
+}
+
+function closeEditModal(){document.getElementById('edit-modal').classList.remove('show');}
+
+function confirmEdit(){
+  var id=parseInt(document.getElementById('edit-id').value);
+  var idx=trades.findIndex(function(t){return t.id===id;});
+  if(idx===-1)return;
+  var pnl=parseFloat(document.getElementById('edit-pnl').value)||0;
+  trades[idx]=Object.assign({},trades[idx],{
+    symbol:(document.getElementById('edit-symbol').value||'').toUpperCase().trim(),
+    side:document.getElementById('edit-side').value,
+    date:document.getElementById('edit-date').value,
+    entry:parseFloat(document.getElementById('edit-entry').value)||0,
+    sl:parseFloat(document.getElementById('edit-sl').value)||0,
+    tp:parseFloat(document.getElementById('edit-tp').value)||0,
+    tp2:parseFloat(document.getElementById('edit-tp2').value)||0,
+    be:parseFloat(document.getElementById('edit-be').value)||0,
+    size:parseFloat(document.getElementById('edit-size').value)||1,
+    status:document.getElementById('edit-status').value,
+    exit:parseFloat(document.getElementById('edit-exit').value)||0,
+    pnl:pnl,netPnl:pnl-COMMISSION,
+    strategy:document.getElementById('edit-strategy').value,
+    emotion:document.getElementById('edit-emotion').value,
+    notes:document.getElementById('edit-notes').value
+  });
+  save();closeEditModal();renderTrades();renderDashboard();
+}
 
 // ─── PHOTOS ──────────────────────────────────────────────────────
 function previewPhoto(input, previewId){
@@ -603,6 +657,35 @@ function nextMonth(){calM++;if(calM>11){calM=0;calY++;}renderCalendar();}
 renderDashboard();
 </script>
 
+
+<!-- MODAL MODIFIER TRADE -->
+<div class="close-modal" id="edit-modal">
+  <div class="modal-box" style="max-width:600px">
+    <div class="modal-title"><i class="ti ti-pencil" style="color:#2a78d6"></i> Modifier le trade</div>
+    <input type="hidden" id="edit-id">
+    <div class="form-grid">
+      <div class="field"><label>Actif</label><input id="edit-symbol" type="text"></div>
+      <div class="field"><label>Direction</label><select id="edit-side"><option value="BUY">Long</option><option value="SELL">Short</option></select></div>
+      <div class="field"><label>Date</label><input id="edit-date" type="date"></div>
+      <div class="field"><label>Prix entree</label><input id="edit-entry" type="number" step="any"></div>
+      <div class="field"><label>Stop-Loss</label><input id="edit-sl" type="number" step="any"></div>
+      <div class="field"><label>TP1</label><input id="edit-tp" type="number" step="any"></div>
+      <div class="field"><label>TP2</label><input id="edit-tp2" type="number" step="any"></div>
+      <div class="field"><label>Break Even (BE)</label><input id="edit-be" type="number" step="any"></div>
+      <div class="field"><label>Taille</label><input id="edit-size" type="number" step="any"></div>
+      <div class="field"><label>Statut</label><select id="edit-status"><option value="open">Ouvert</option><option value="closed">Ferme</option></select></div>
+      <div class="field"><label>Prix sortie</label><input id="edit-exit" type="number" step="any"></div>
+      <div class="field"><label>P&amp;L ($)</label><input id="edit-pnl" type="number" step="any"></div>
+      <div class="field"><label>Strategie</label><select id="edit-strategy"><option>EMA + VWAP</option><option>TPO / POC</option><option>Confluence Multi-TF</option><option>Breakout</option><option>Support/Resistance</option><option>Rejet VWAP</option><option>Zone Fibonacci</option><option>Autre</option></select></div>
+      <div class="field"><label>Emotion</label><select id="edit-emotion"><option>Neutre</option><option>Confiant</option><option>Hesitant</option><option>FOMO</option><option>Stresse</option><option>Discipline</option></select></div>
+    </div>
+    <div class="field" style="margin-top:10px"><label>Notes</label><textarea id="edit-notes" style="min-height:60px"></textarea></div>
+    <div class="btn-row">
+      <button class="btn" onclick="closeEditModal()">Annuler</button>
+      <button class="btn primary" onclick="confirmEdit()"><i class="ti ti-check"></i> Sauvegarder</button>
+    </div>
+  </div>
+</div>
 <!-- MODAL PHOTO AGRANDIE -->
 <div class="photo-modal" id="photo-modal" onclick="this.classList.remove('show')">
   <img id="photo-modal-img" src="" alt="Capture agrandie">
