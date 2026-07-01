@@ -23,7 +23,7 @@ function saveTrades(t){ fs.writeFileSync(TRADES_FILE,JSON.stringify(t,null,2)); 
 async function sendTelegram(text){
   try{
     await axios.post(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`,
-      {chat_id:TG_CHAT,text,parse_mode:"Markdown"});
+      {chat_id:TG_CHAT,text});
     console.log("Telegram OK");
   }catch(e){ console.error("Telegram error:",e.response?.data||e.message); }
 }
@@ -36,7 +36,7 @@ async function sendMorningBriefing(){
       model:"claude-sonnet-4-6",
       max_tokens:2048,
       tools:[{type:"web_search_20250305",name:"web_search"}],
-      messages:[{role:"user",content:"Tu es un analyste de trading professionnel. Aujourd'hui c'est le "+today+".\n\nRecherche sur le web les informations du jour sur GOLD et DAX, puis genere ce briefing en francais. Utilise * pour le gras, pas de # ni ## :\n\n* BRIEFING MATINAL - "+today+" *\n\n━━━━━━━━━━━━━━━\n* GOLD (XAU/USD) *\n━━━━━━━━━━━━━━━\nPrix : [VRAI PRIX]\nTendance : [haussiere/baissiere/neutre]\nResistance : [niveau] | Support : [niveau]\nTrade : [LONG / SHORT / NEUTRE]\nRisque : [risque principal]\n\n━━━━━━━━━━━━━━━\n* DAX (GER40) *\n━━━━━━━━━━━━━━━\nPrix : [VRAI PRIX]\nTendance : [haussiere/baissiere/neutre]\nResistance : [niveau] | Support : [niveau]\nTrade : [LONG / SHORT / NEUTRE]\nRisque : [risque principal]\n\n━━━━━━━━━━━━━━━\n* AGENDA DU JOUR *\n━━━━━━━━━━━━━━━\n[annonces avec heure et impact]\n\n━━━━━━━━━━━━━━━\n* NEWS CLES *\n━━━━━━━━━━━━━━━\n[2-3 news importantes]\n\n━━━━━━━━━━━━━━━\n* STRATEGIE DU JOUR *\n━━━━━━━━━━━━━━━\n[synthese en 2-3 phrases]\n\nClaude AI Trading"}]
+      messages:[{role:"user",content:"Tu es un analyste de trading. Recherche le prix GOLD et DAX aujourd'hui le "+today+". Reponds en francais sans symboles speciaux:\n\nBRIEFING "+today+"\n\nGOLD\nPrix : [prix]\nTendance : [haussiere/baissiere]\nResistance : [niveau] | Support : [niveau]\nTrade : [LONG/SHORT/NEUTRE]\nRisque : [risque]\n\nDAX\nPrix : [prix]\nTendance : [haussiere/baissiere]\nResistance : [niveau] | Support : [niveau]\nTrade : [LONG/SHORT/NEUTRE]\nRisque : [risque]\n\nAGENDA\n[annonces importantes]\n\nNEWS\n[2-3 news cles]\n\nSTRATEGIE\n[synthese en 2 phrases]"
     },{headers:{"x-api-key":ANTHROPIC_KEY,"anthropic-version":"2023-06-01","content-type":"application/json"}});
     const txt=res.data.content.find(b=>b.type==="text")?.text||"Erreur contenu";
     console.log("Briefing genere, longueur:"+txt.length);
