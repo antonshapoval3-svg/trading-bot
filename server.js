@@ -40,11 +40,11 @@ async function sendMorningBriefing(){
     },{headers:{"x-api-key":ANTHROPIC_KEY,"anthropic-version":"2023-06-01","content-type":"application/json"}});
     const txt=res.data.content.find(b=>b.type==="text")?.text||"Erreur contenu";
     console.log("Briefing genere, longueur:"+txt.length);
-    if(txt.length>3800){
+    if(txt.length>1500){
       let remaining=txt;
       while(remaining.length>0){
-        let cut=remaining.lastIndexOf("\n",3800);
-        if(cut<=0) cut=3800;
+       let cut=remaining.lastIndexOf("\n",1500);
+if(cut<=0) cut=1500;
         await sendTelegram(remaining.substring(0,cut));
         remaining=remaining.substring(cut).trim();
         await new Promise(r=>setTimeout(r,500));
