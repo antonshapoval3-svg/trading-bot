@@ -62,7 +62,7 @@ async function sendMorningBriefing(){
 function scheduleBriefing(){
   const now=new Date();
   const next=new Date();
-  next.setUTCHours(7,30,0,0);
+  next.setUTCHours(6,30,0,0);
   if(now>=next) next.setDate(next.getDate()+1);
   const delay=next-now;
   const minutes=Math.round(delay/60000);
