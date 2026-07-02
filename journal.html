@@ -164,7 +164,7 @@ tr:hover td{background:#fafaf8}
     <div style="display:flex;gap:16px;margin-bottom:12px;flex-wrap:wrap">
       <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:#555"><div style="width:12px;height:12px;background:#d4f1e4;border:1px solid #1baf7a;border-radius:3px"></div>Positive</div>
       <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:#555"><div style="width:12px;height:12px;background:#fde8e8;border:1px solid #e34948;border-radius:3px"></div>Negative</div>
-      <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:#555"><div style="width:12px;height:12px;background:#f0f4ff;border:1.5px solid #2a78d6;border-radius:3px"></div>Trade ouvert</div><div style="display:flex;align-items:center;gap:5px;font-size:12px;color:#555"><div style="width:12px;height:12px;background:#f5f5f0;border:1px solid #e1e0d9;border-radius:3px"></div>Pas de trade</div>
+      <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:#555"><div style="width:12px;height:12px;background:#f5f5f0;border:1px solid #e1e0d9;border-radius:3px"></div>Pas de trade</div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:4px">
       <div style="text-align:center;font-size:11px;color:#888;font-weight:500;padding:4px">Lun</div>
@@ -579,21 +579,11 @@ function renderDashboard(){
 }
 function buildDayMap(){
   var map={};
-  trades.forEach(function(t){
+  trades.filter(function(t){return t.status==='closed';}).forEach(function(t){
     if(!t.date)return;
-    if(!map[t.date])map[t.date]={pnl:0,count:0,wins:0,losses:0,open:0,symbols:[]};
-    // Considere comme trade pris si P&L rempli OU statut ferme
-    var hasPnl = t.pnl !== 0 && t.pnl !== null && t.pnl !== undefined;
-    var isClosed = t.status==='closed' || hasPnl;
-    if(isClosed){
-      map[t.date].pnl+=(t.pnl||0);
-      if(t.pnl>0)map[t.date].wins++;
-      else if(t.pnl<0)map[t.date].losses++;
-      else map[t.date].open++; // P&L = 0 = trade en cours
-    } else {
-      map[t.date].open++;
-    }
-    map[t.date].count++;
+    if(!map[t.date])map[t.date]={pnl:0,count:0,wins:0,losses:0,symbols:[]};
+    map[t.date].pnl+=(t.pnl||0);map[t.date].count++;
+    if(t.pnl>0)map[t.date].wins++;else if(t.pnl<0)map[t.date].losses++;
     if(t.symbol&&map[t.date].symbols.indexOf(t.symbol)===-1)map[t.date].symbols.push(t.symbol);
   });
   return map;
@@ -616,23 +606,18 @@ function renderCalendar(){
       var dow=new Date(calY,calM,d).getDay();
       var isWE=dow===0||dow===6;
       var bg='#f5f5f0',border='1px solid #e1e0d9';
-      if(dd){var closedTr=dd.wins+dd.losses;var hasPnlData=closedTr>0||dd.pnl!==0;if(hasPnlData){bg=dd.pnl>0?'#d4f1e4':dd.pnl<0?'#fde8e8':'#f0f0f0';border=dd.pnl>0?'1.5px solid #1baf7a':dd.pnl<0?'1.5px solid #e34948':'1px solid #ccc';}else if(dd.open>0){bg='#f0f4ff';border='1.5px solid #2a78d6';}}
+      if(dd){bg=dd.pnl>0?'#d4f1e4':dd.pnl<0?'#fde8e8':'#f0f0f0';border=dd.pnl>0?'1.5px solid #1baf7a':dd.pnl<0?'1.5px solid #e34948':'1px solid #ccc';}
       var cell=document.createElement('div');
       cell.style.cssText='min-height:72px;border-radius:8px;padding:6px 8px;cursor:'+(dd?'pointer':'default')+';background:'+bg+';border:'+border+';'+(isToday?'box-shadow:0 0 0 2px #2a78d6;':'');
       var nc=isToday?'#2a78d6':isWE?'#bbb':'#0b0b0b';
       var inner='<div style="font-size:12px;font-weight:'+(isToday?700:500)+';color:'+nc+'">'+d+'</div>';
       if(dd){
-        var closedCount=dd.wins+dd.losses;
-        var pc=dd.pnl>0?'#159965':dd.pnl<0?'#c0392b':'#888';
-        var ps=closedCount>0?(dd.pnl>0?'+':'')+dd.pnl.toFixed(2)+'$':'—';
-        var wr=closedCount>0?Math.round(dd.wins/closedCount*100):0;
-        if(dd.pnl!==0||closedCount>0){
-          inner+='<div class="cal-info" style="font-size:11px;font-weight:600;color:'+pc+';margin-top:3px">'+ps+'</div>';
-        }
-        inner+='<div class="cal-info" style="font-size:10px;color:#555;margin-top:2px">'+dd.count+' trade'+(dd.count>1?'s':'')+(dd.open>0?' ('+dd.open+' ouv.)':'')+'</div>';
-        if(closedCount>0){
-          inner+='<div class="cal-info" style="font-size:10px;color:#555">'+dd.wins+'W/'+dd.losses+'L &middot; '+wr+'%</div>';
-        }
+        var pc=dd.pnl>0?'#159965':'#c0392b';
+        var ps=(dd.pnl>0?'+':'')+dd.pnl.toFixed(2)+'$';
+        var wr=Math.round(dd.wins/dd.count*100);
+        inner+='<div class="cal-info" style="font-size:11px;font-weight:600;color:'+pc+';margin-top:3px">'+ps+'</div>';
+        inner+='<div class="cal-info" style="font-size:10px;color:#555;margin-top:2px">'+dd.count+' trade'+(dd.count>1?'s':'')+'</div>';
+        inner+='<div class="cal-info" style="font-size:10px;color:#555">'+dd.wins+'W/'+dd.losses+'L &middot; '+wr+'%</div>';
       }
       cell.innerHTML=inner;
       if(dd){
@@ -640,7 +625,7 @@ function renderCalendar(){
           var tip=document.getElementById('cal-tooltip');
           var ps=(dd.pnl>0?'+':'')+dd.pnl.toFixed(2)+'$';
           var wr=Math.round(dd.wins/dd.count*100);
-          var ttClosedCount=dd.wins+dd.losses;var ttPs=ttClosedCount>0?(dd.pnl>0?'+':'')+dd.pnl.toFixed(2)+'$':'Pas de trades fermes';var ttWr=ttClosedCount>0?Math.round(dd.wins/ttClosedCount*100):0;tip.innerHTML='<strong>'+d+' '+MONTHS[calM]+'</strong><br>P&L : <span style="color:'+(dd.pnl>0?'#4ade80':dd.pnl<0?'#f87171':'#aaa')+'">'+ttPs+'</span><br>Trades : '+dd.count+(dd.open>0?' ('+dd.open+' ouvert'+(dd.open>1?'s':'')+')'  :'')+'<br>'+(ttClosedCount>0?'Fermes : '+ttClosedCount+' ('+dd.wins+'W/'+dd.losses+'L) &middot; '+ttWr+'%<br>':'')+'Actifs : '+(dd.symbols.join(', ')||'—');
+          tip.innerHTML='<strong>'+d+' '+MONTHS[calM]+'</strong><br>P&L : <span style="color:'+(dd.pnl>0?'#4ade80':'#f87171')+'">'+ps+'</span><br>Trades : '+dd.count+' ('+dd.wins+'W/'+dd.losses+'L)<br>Win rate : '+wr+'%<br>Actifs : '+(dd.symbols.join(', ')||'—');
           tip.style.display='block';moveTip(ev);
         });
         cell.addEventListener('mousemove',moveTip);
