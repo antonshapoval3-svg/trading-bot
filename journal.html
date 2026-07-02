@@ -476,10 +476,10 @@ function openEditModal(id){
   document.getElementById('edit-sl').value=t.sl||'';
   document.getElementById('edit-tp').value=t.tp||'';
   document.getElementById('edit-tp2').value=t.tp2||'';
-  document.getElementById('edit-be').value=t.be||'';
+  
   document.getElementById('edit-size').value=t.size||1;
   document.getElementById('edit-status').value=t.status||'open';
-  document.getElementById('edit-exit').value=t.exit||'';
+  
   document.getElementById('edit-pnl').value=t.pnl||'';
   document.getElementById('edit-strategy').value=t.strategy||'EMA + VWAP';
   document.getElementById('edit-emotion').value=t.emotion||'Neutre';
@@ -502,10 +502,10 @@ function confirmEdit(){
     sl:parseFloat(document.getElementById('edit-sl').value)||0,
     tp:parseFloat(document.getElementById('edit-tp').value)||0,
     tp2:parseFloat(document.getElementById('edit-tp2').value)||0,
-    be:parseFloat(document.getElementById('edit-be').value)||0,
+    be:0,
     size:parseFloat(document.getElementById('edit-size').value)||1,
     status:document.getElementById('edit-status').value,
-    exit:parseFloat(document.getElementById('edit-exit').value)||0,
+    exit:0,
     pnl:pnl,netPnl:pnl-COMMISSION,
     strategy:document.getElementById('edit-strategy').value,
     emotion:document.getElementById('edit-emotion').value,
@@ -677,10 +677,10 @@ renderDashboard();
       <div class="field"><label>Stop-Loss</label><input id="edit-sl" type="number" step="any"></div>
       <div class="field"><label>TP1</label><input id="edit-tp" type="number" step="any"></div>
       <div class="field"><label>TP2</label><input id="edit-tp2" type="number" step="any"></div>
-      <div class="field"><label>Break Even (BE)</label><input id="edit-be" type="number" step="any"></div>
+      
       <div class="field"><label>Taille</label><input id="edit-size" type="number" step="any"></div>
       <div class="field"><label>Statut</label><select id="edit-status"><option value="open">Ouvert</option><option value="closed">Ferme</option></select></div>
-      <div class="field"><label>Prix sortie</label><input id="edit-exit" type="number" step="any"></div>
+      
       <div class="field"><label>P&amp;L ($)</label><input id="edit-pnl" type="number" step="any"></div>
       <div class="field"><label>Strategie</label><select id="edit-strategy"><option>EMA + VWAP</option><option>TPO / POC</option><option>Confluence Multi-TF</option><option>Breakout</option><option>Support/Resistance</option><option>Rejet VWAP</option><option>Zone Fibonacci</option><option>Autre</option></select></div>
       <div class="field"><label>Emotion</label><select id="edit-emotion"><option>Neutre</option><option>Confiant</option><option>Hesitant</option><option>FOMO</option><option>Stresse</option><option>Discipline</option></select></div>
