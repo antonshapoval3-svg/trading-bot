@@ -403,18 +403,18 @@ function saveTrade(){
   var symbol=(document.getElementById('f-symbol').value||'').toUpperCase().trim();
   if(!symbol){alert('Entre un actif !');return;}
   var pnl=parseFloat(document.getElementById('f-pnl').value)||0;
-  var t={id:Date.now(),symbol:symbol,side:document.getElementById('f-side').value,date:document.getElementById('f-date').value,entry:parseFloat(document.getElementById('f-entry').value)||0,sl:parseFloat(document.getElementById('f-sl').value)||0,tp:parseFloat(document.getElementById('f-tp').value)||0,tp2:parseFloat(document.getElementById('f-tp2').value)||0,be:parseFloat(document.getElementById('f-be').value)||0,size:parseFloat(document.getElementById('f-size').value)||1,status:document.getElementById('f-status').value,exit:parseFloat(document.getElementById('f-exit').value)||0,pnl:pnl,netPnl:pnl-COMMISSION,strategy:document.getElementById('f-strategy').value,emotion:document.getElementById('f-emotion').value,notes:document.getElementById('f-notes').value};
+  var t={id:Date.now(),symbol:symbol,side:document.getElementById('f-side').value,date:document.getElementById('f-date').value,entry:parseFloat(document.getElementById('f-entry').value)||0,sl:parseFloat(document.getElementById('f-sl').value)||0,tp:parseFloat(document.getElementById('f-tp').value)||0,tp2:parseFloat(document.getElementById('f-tp2').value)||0,be:0,size:parseFloat(document.getElementById('f-size').value)||1,status:document.getElementById('f-status').value,exit:0,pnl:pnl,netPnl:pnl-COMMISSION,strategy:document.getElementById('f-strategy').value,emotion:document.getElementById('f-emotion').value,notes:document.getElementById('f-notes').value};
   var photo = getPhotoData('f-photo-img');
   if(photo) t.photo = photo;
   trades.unshift(t);save();updateCount();clearForm();showPage('trades');
 }
 function clearForm(){
-  ['f-symbol','f-entry','f-sl','f-tp','f-size','f-exit','f-pnl','f-notes'].forEach(function(id){document.getElementById(id).value='';});
+  ['f-symbol','f-entry','f-sl','f-tp','f-size','f-pnl','f-notes'].forEach(function(id){document.getElementById(id).value='';});
   document.getElementById('f-date').value=new Date().toISOString().split('T')[0];
   document.getElementById('f-side').value='BUY';
   document.getElementById('f-status').value='open';
   removePhoto('f-photo','f-photo-preview','f-photo-img');
-  ['f-tp2','f-be'].forEach(function(id){document.getElementById(id).value='';});
+  
 }
 function filterTrades(mode,btn){filterMode=mode;document.querySelectorAll('.filter-btn').forEach(function(b){b.classList.remove('active');});btn.classList.add('active');renderTrades();}
 function renderTrades(){
