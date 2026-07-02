@@ -428,7 +428,7 @@ function renderTrades(){
   tbody.innerHTML=list.map(function(t){
     var net=t.netPnl!=null?t.netPnl:t.pnl;
     var isOpen=t.status==='open',isWin=t.pnl>0;
-    return'<tr><td style="white-space:nowrap">'+t.date+'</td><td><strong>'+t.symbol+'</strong></td><td><span class="badge '+(t.side==='BUY'?'buy':'sell')+'">'+(t.side==='BUY'?'Long':'Short')+'</span></td><td>'+(t.entry||'—')+'</td><td>'+(t.exit||'—')+'</td><td style="color:#e34948">'+(t.sl||'—')+'</td><td style="color:#1baf7a">'+(t.tp||'—')+'</td><td>'+(t.size||1)+'</td><td style="color:'+(t.pnl>0?'#1baf7a':t.pnl<0?'#e34948':'#888')+';font-weight:500">'+(t.pnl>0?'+':'')+(t.pnl?t.pnl.toFixed(2):'—')+'</td><td style="color:'+(net>0?'#1baf7a':net<0?'#e34948':'#888')+';font-weight:500">'+(net>0?'+':'')+(net?net.toFixed(2):'—')+'</td><td><span class="badge '+(isOpen?'open':isWin?'win':'loss')+'">'+(isOpen?'Ouvert':isWin?'Win':'Loss')+'</span></td><td style="font-size:11px;color:#888">'+(t.strategy||'—')+'</td><td style="font-size:11px;color:#888">'+(t.emotion||'—')+'</td><td style="font-size:11px;color:#aaa;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(t.notes||'—')+'</td><td style="white-space:nowrap"><button class="btn" style="padding:3px 8px;font-size:11px;margin-right:4px" onclick="openEditModal('+t.id+')"><i class="ti ti-pencil"></i></button>'+(isOpen?'<button class="btn success" style="padding:3px 8px;font-size:11px;margin-right:4px" onclick="openCloseModal('+t.id+')"><i class="ti ti-lock"></i></button>':'')+'<button class="btn danger" style="padding:3px 8px;font-size:11px" onclick="deleteTrade('+t.id+')"><i class="ti ti-trash"></i></button></td></tr>'
+    return'<tr><td style="white-space:nowrap">'+t.date+'</td><td><strong>'+t.symbol+'</strong></td><td><span class="badge '+(t.side==='BUY'?'buy':'sell')+'">'+(t.side==='BUY'?'Long':'Short')+'</span></td><td>'+(t.entry||'—')+'</td><td>'+(t.exit||'—')+'</td><td style="color:#e34948">'+(t.sl||'—')+'</td><td style="color:#1baf7a">'+(t.tp||'—')+'</td><td>'+(t.size||1)+'</td><td style="color:'+(t.pnl>0?'#1baf7a':t.pnl<0?'#e34948':'#888')+';font-weight:500">'+(t.pnl>0?'+':'')+(t.pnl?t.pnl.toFixed(2):'—')+'</td><td style="color:'+(net>0?'#1baf7a':net<0?'#e34948':'#888')+';font-weight:500">'+(net>0?'+':'')+(net?net.toFixed(2):'—')+'</td><td><span class="badge '+(isOpen?'open':isWin?'win':'loss')+'">'+(isOpen?'Ouvert':isWin?'Win':'Loss')+'</span></td><td style="font-size:11px;color:#888">'+(t.strategy||'—')+'</td><td style="font-size:11px;color:#888">'+(t.emotion||'—')+'</td><td style="font-size:11px;color:#aaa;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(t.notes||'—')+'</td><td>'+(isOpen?'<button class="btn success" style="padding:3px 8px;font-size:11px" onclick="openCloseModal('+t.id+')"><i class="ti ti-lock"></i></button>':'')+'<button class="btn danger" style="padding:3px 8px;font-size:11px;margin-left:4px" onclick="deleteTrade('+t.id+')"><i class="ti ti-trash"></i></button></td></tr>'
     + (t.photo||t.photoExit ? '<tr style="background:'+(t.pnl>0?'#f0fdf4':t.pnl<0?'#fff5f5':'#fafaf8')+'"><td colspan="15" style="padding:8px 12px">'
       +(t.photo?'<img src="'+t.photo+'" class="trade-photo" onclick="showPhotoModal(this.src)" title="Cliquer pour agrandir">':'')
       +(t.photoExit?'<img src="'+t.photoExit+'" class="trade-photo" style="margin-left:8px" onclick="showPhotoModal(this.src)" title="Capture sortie">':'')
@@ -579,11 +579,17 @@ function renderDashboard(){
 }
 function buildDayMap(){
   var map={};
-  trades.filter(function(t){return t.status==='closed';}).forEach(function(t){
+  trades.forEach(function(t){
     if(!t.date)return;
-    if(!map[t.date])map[t.date]={pnl:0,count:0,wins:0,losses:0,symbols:[]};
-    map[t.date].pnl+=(t.pnl||0);map[t.date].count++;
-    if(t.pnl>0)map[t.date].wins++;else if(t.pnl<0)map[t.date].losses++;
+    if(!map[t.date])map[t.date]={pnl:0,count:0,wins:0,losses:0,open:0,symbols:[]};
+    if(t.status==='closed'){
+      map[t.date].pnl+=(t.pnl||0);
+      if(t.pnl>0)map[t.date].wins++;
+      else if(t.pnl<0)map[t.date].losses++;
+    } else {
+      map[t.date].open++;
+    }
+    map[t.date].count++;
     if(t.symbol&&map[t.date].symbols.indexOf(t.symbol)===-1)map[t.date].symbols.push(t.symbol);
   });
   return map;
@@ -616,7 +622,7 @@ function renderCalendar(){
         var ps=(dd.pnl>0?'+':'')+dd.pnl.toFixed(2)+'$';
         var wr=Math.round(dd.wins/dd.count*100);
         inner+='<div class="cal-info" style="font-size:11px;font-weight:600;color:'+pc+';margin-top:3px">'+ps+'</div>';
-        inner+='<div class="cal-info" style="font-size:10px;color:#555;margin-top:2px">'+dd.count+' trade'+(dd.count>1?'s':'')+'</div>';
+        inner+='<div class="cal-info" style="font-size:10px;color:#555;margin-top:2px">'+dd.count+' trade'+(dd.count>1?'s':'')+(dd.open>0?' ('+dd.open+' ouv.)':'')+'</div>';
         inner+='<div class="cal-info" style="font-size:10px;color:#555">'+dd.wins+'W/'+dd.losses+'L &middot; '+wr+'%</div>';
       }
       cell.innerHTML=inner;
