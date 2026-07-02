@@ -582,9 +582,14 @@ function buildDayMap(){
   trades.forEach(function(t){
     if(!t.date)return;
     if(!map[t.date])map[t.date]={pnl:0,count:0,wins:0,losses:0,open:0,symbols:[]};
-    if(t.status==='closed'){
+    // Considere comme trade pris si P&L rempli OU statut ferme
+    var hasPnl = t.pnl !== 0 && t.pnl !== null && t.pnl !== undefined;
+    var isClosed = t.status==='closed' || hasPnl;
+    if(isClosed){
       map[t.date].pnl+=(t.pnl||0);
-      if(t.pnl>0)map[t.date].wins++;else if(t.pnl<0)map[t.date].losses++;
+      if(t.pnl>0)map[t.date].wins++;
+      else if(t.pnl<0)map[t.date].losses++;
+      else map[t.date].open++; // P&L = 0 = trade en cours
     } else {
       map[t.date].open++;
     }
@@ -611,7 +616,7 @@ function renderCalendar(){
       var dow=new Date(calY,calM,d).getDay();
       var isWE=dow===0||dow===6;
       var bg='#f5f5f0',border='1px solid #e1e0d9';
-      if(dd){var closedTr=dd.wins+dd.losses;if(closedTr>0){bg=dd.pnl>0?'#d4f1e4':dd.pnl<0?'#fde8e8':'#f0f0f0';border=dd.pnl>0?'1.5px solid #1baf7a':dd.pnl<0?'1.5px solid #e34948':'1px solid #ccc';}else{bg='#f0f4ff';border='1.5px solid #2a78d6';}}
+      if(dd){var closedTr=dd.wins+dd.losses;var hasPnlData=closedTr>0||dd.pnl!==0;if(hasPnlData){bg=dd.pnl>0?'#d4f1e4':dd.pnl<0?'#fde8e8':'#f0f0f0';border=dd.pnl>0?'1.5px solid #1baf7a':dd.pnl<0?'1.5px solid #e34948':'1px solid #ccc';}else if(dd.open>0){bg='#f0f4ff';border='1.5px solid #2a78d6';}}
       var cell=document.createElement('div');
       cell.style.cssText='min-height:72px;border-radius:8px;padding:6px 8px;cursor:'+(dd?'pointer':'default')+';background:'+bg+';border:'+border+';'+(isToday?'box-shadow:0 0 0 2px #2a78d6;':'');
       var nc=isToday?'#2a78d6':isWE?'#bbb':'#0b0b0b';
