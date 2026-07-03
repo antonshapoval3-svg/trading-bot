@@ -375,6 +375,31 @@ tr:hover td{background:var(--bg3)}
       <div class="field"><label>Émotion</label><select id="edit-emotion"><option>Neutre</option><option>Confiant</option><option>Hésitant</option><option>FOMO</option><option>Stressé</option><option>Discipliné</option></select></div>
     </div>
     <div class="field" style="margin-top:10px"><label>Notes</label><textarea id="edit-notes" style="min-height:60px"></textarea></div>
+    <!-- PHOTOS EDIT -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+      <div>
+        <div style="font-size:11px;color:var(--text2);margin-bottom:6px">Photo d'entrée</div>
+        <div id="edit-photo-entry-preview" style="display:none;position:relative;margin-bottom:8px">
+          <img id="edit-photo-entry-img" src="" style="max-width:100%;max-height:120px;border-radius:6px;border:1px solid var(--border);display:block;cursor:pointer" onclick="showPhotoModal(this.src)">
+          <button onclick="removeEditPhoto('entry')" style="position:absolute;top:4px;right:4px;background:var(--red);color:#fff;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:11px">✕</button>
+        </div>
+        <div class="photo-upload-btn" style="padding:8px" onclick="document.getElementById('edit-photo-entry-input').click()">
+          <i class="ti ti-camera" style="font-size:15px"></i> Modifier photo entrée
+        </div>
+        <input type="file" id="edit-photo-entry-input" accept="image/*" style="display:none" onchange="loadEditPhoto(this,'entry')">
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--text2);margin-bottom:6px">Photo de sortie</div>
+        <div id="edit-photo-exit-preview" style="display:none;position:relative;margin-bottom:8px">
+          <img id="edit-photo-exit-img" src="" style="max-width:100%;max-height:120px;border-radius:6px;border:1px solid var(--border);display:block;cursor:pointer" onclick="showPhotoModal(this.src)">
+          <button onclick="removeEditPhoto('exit')" style="position:absolute;top:4px;right:4px;background:var(--red);color:#fff;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:11px">✕</button>
+        </div>
+        <div class="photo-upload-btn" style="padding:8px" onclick="document.getElementById('edit-photo-exit-input').click()">
+          <i class="ti ti-camera" style="font-size:15px"></i> Modifier photo sortie
+        </div>
+        <input type="file" id="edit-photo-exit-input" accept="image/*" style="display:none" onchange="loadEditPhoto(this,'exit')">
+      </div>
+    </div>
     <div class="btn-row">
       <button class="btn" onclick="closeEditModal()">Annuler</button>
       <button class="btn primary" onclick="confirmEdit()"><i class="ti ti-check"></i> Sauvegarder</button>
@@ -586,6 +611,21 @@ function openEditModal(id){
   document.getElementById('edit-strategy').value=t.strategy||'EMA + VWAP';
   document.getElementById('edit-emotion').value=t.emotion||'Neutre';
   document.getElementById('edit-notes').value=t.notes||'';
+  // Load existing photos
+  editPhotoEntry = t.photo || null;
+  editPhotoExit  = t.photoExit || null;
+  if(t.photo){
+    document.getElementById('edit-photo-entry-img').src = t.photo;
+    document.getElementById('edit-photo-entry-preview').style.display = 'block';
+  } else {
+    document.getElementById('edit-photo-entry-preview').style.display = 'none';
+  }
+  if(t.photoExit){
+    document.getElementById('edit-photo-exit-img').src = t.photoExit;
+    document.getElementById('edit-photo-exit-preview').style.display = 'block';
+  } else {
+    document.getElementById('edit-photo-exit-preview').style.display = 'none';
+  }
   document.getElementById('edit-modal').classList.add('show');
 }
 function closeEditModal(){document.getElementById('edit-modal').classList.remove('show');}
@@ -594,6 +634,9 @@ function confirmEdit(){
   var idx=trades.findIndex(function(t){return t.id===id;});if(idx===-1)return;
   var pnl=parseFloat(document.getElementById('edit-pnl').value)||0;
   trades[idx]=Object.assign({},trades[idx],{symbol:(document.getElementById('edit-symbol').value||'').toUpperCase().trim(),side:document.getElementById('edit-side').value,date:document.getElementById('edit-date').value,entry:parseFloat(document.getElementById('edit-entry').value)||0,sl:parseFloat(document.getElementById('edit-sl').value)||0,tp:parseFloat(document.getElementById('edit-tp').value)||0,tp2:parseFloat(document.getElementById('edit-tp2').value)||0,size:parseFloat(document.getElementById('edit-size').value)||1,status:document.getElementById('edit-status').value,pnl:pnl,netPnl:pnl,strategy:document.getElementById('edit-strategy').value,emotion:document.getElementById('edit-emotion').value,notes:document.getElementById('edit-notes').value});
+  // Save photos
+  if(editPhotoEntry !== null) trades[idx].photo = editPhotoEntry;
+  if(editPhotoExit !== null) trades[idx].photoExit = editPhotoExit;
   save();closeEditModal();renderTrades();renderDashboard();
 }
 
@@ -611,6 +654,43 @@ function confirmClose(){
 function saveNote(){var txt=document.getElementById('note-input').value.trim();if(!txt)return;notes.unshift({id:Date.now(),text:txt,date:new Date().toLocaleDateString('fr-FR')});save();document.getElementById('note-input').value='';renderNotes();}
 function renderNotes(){var el=document.getElementById('notes-list');if(!notes.length){el.innerHTML='<p class="empty">Aucune note</p>';return;}el.innerHTML=notes.map(function(n){return'<div class="note-card">'+n.text+'<div class="note-date">'+n.date+' <button onclick="deleteNote('+n.id+')" style="border:none;background:none;color:var(--red);cursor:pointer;font-size:11px;margin-left:8px"><i class="ti ti-trash"></i></button></div></div>';}).join('');}
 function deleteNote(id){notes=notes.filter(function(n){return n.id!==id;});save();renderNotes();}
+
+// ─── PHOTOS DANS MODIFIER ────────────────────────────────────────
+var editPhotoEntry = null;
+var editPhotoExit  = null;
+
+function loadEditPhoto(input, type){
+  var file = input.files[0];
+  if(!file) return;
+  if(file.size > 2*1024*1024){ alert('Image trop lourde (max 2MB)'); input.value=''; return; }
+  var reader = new FileReader();
+  reader.onload = function(e){
+    if(type === 'entry'){
+      editPhotoEntry = e.target.result;
+      document.getElementById('edit-photo-entry-img').src = e.target.result;
+      document.getElementById('edit-photo-entry-preview').style.display = 'block';
+    } else {
+      editPhotoExit = e.target.result;
+      document.getElementById('edit-photo-exit-img').src = e.target.result;
+      document.getElementById('edit-photo-exit-preview').style.display = 'block';
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeEditPhoto(type){
+  if(type === 'entry'){
+    editPhotoEntry = null;
+    document.getElementById('edit-photo-entry-img').src = '';
+    document.getElementById('edit-photo-entry-preview').style.display = 'none';
+    document.getElementById('edit-photo-entry-input').value = '';
+  } else {
+    editPhotoExit = null;
+    document.getElementById('edit-photo-exit-img').src = '';
+    document.getElementById('edit-photo-exit-preview').style.display = 'none';
+    document.getElementById('edit-photo-exit-input').value = '';
+  }
+}
 
 function previewPhoto(input,previewId,imgId){var file=input.files[0];if(!file)return;if(file.size>2*1024*1024){alert('Image trop lourde (max 2MB)');input.value='';return;}var reader=new FileReader();reader.onload=function(e){var wrap=document.getElementById(previewId);document.getElementById(imgId).src=e.target.result;wrap.style.display='inline-block';};reader.readAsDataURL(file);}
 function removePhoto(inputId,previewId,imgId){document.getElementById(inputId).value='';document.getElementById(imgId).src='';document.getElementById(previewId).style.display='none';}
