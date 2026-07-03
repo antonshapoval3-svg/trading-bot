@@ -465,6 +465,42 @@ function deleteNote(id){notes=notes.filter(function(n){return n.id!==id;});save(
 
 
 // ─── MODIFIER TRADE ───────────────────────────────────────────────
+// ─── PHOTOS DANS MODIFIER ────────────────────────────────
+var editPhotoEntry = null;
+var editPhotoExit  = null;
+
+function editPreviewPhoto(input, type){
+  var file = input.files[0];
+  if(!file) return;
+  if(file.size > 2*1024*1024){ alert('Image trop lourde (max 2MB)'); input.value=''; return; }
+  var reader = new FileReader();
+  reader.onload = function(e){
+    if(type==='entry'){
+      editPhotoEntry = e.target.result;
+      renderEditPhotoPreview('edit-photo-preview', editPhotoEntry, 'entry');
+    } else {
+      editPhotoExit = e.target.result;
+      renderEditPhotoPreview('edit-photo-exit-preview', editPhotoExit, 'exit');
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function renderEditPhotoPreview(containerId, src, type){
+  var wrap = document.getElementById(containerId);
+  if(!src){ wrap.innerHTML=''; return; }
+  wrap.innerHTML = '<div style="position:relative;display:inline-block">'
+    + '<img src="'+src+'" style="max-width:100%;max-height:150px;border-radius:8px;border:1px solid #e1e0d9;display:block;cursor:pointer" onclick="showPhotoModal(this.src)">'
+    + '<button onclick="removeEditPhoto(''+containerId+'',''+type+'')" style="position:absolute;top:4px;right:4px;background:#e34948;color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center">&#x2715;</button>'
+    + '</div>';
+}
+
+function removeEditPhoto(containerId, type){
+  if(type==='entry'){ editPhotoEntry=null; document.getElementById('edit-photo-input').value=''; }
+  else { editPhotoExit=null; document.getElementById('edit-photo-exit-input').value=''; }
+  document.getElementById(containerId).innerHTML='';
+}
+
 function openEditModal(id){
   var t=trades.find(function(t){return t.id===id;});
   if(!t)return;
@@ -484,6 +520,11 @@ function openEditModal(id){
   document.getElementById('edit-strategy').value=t.strategy||'EMA + VWAP';
   document.getElementById('edit-emotion').value=t.emotion||'Neutre';
   document.getElementById('edit-notes').value=t.notes||'';
+  // Load existing photos
+  editPhotoEntry = t.photo || null;
+  editPhotoExit  = t.photoExit || null;
+  renderEditPhotoPreview('edit-photo-preview', editPhotoEntry, 'entry');
+  renderEditPhotoPreview('edit-photo-exit-preview', editPhotoExit, 'exit');
   document.getElementById('edit-modal').classList.add('show');
 }
 
@@ -511,6 +552,8 @@ function confirmEdit(){
     emotion:document.getElementById('edit-emotion').value,
     notes:document.getElementById('edit-notes').value
   });
+  if(editPhotoEntry !== null) trades[idx].photo = editPhotoEntry;
+  if(editPhotoExit  !== null) trades[idx].photoExit = editPhotoExit;
   save();closeEditModal();renderTrades();renderDashboard();
 }
 
@@ -686,6 +729,22 @@ renderDashboard();
       <div class="field"><label>Emotion</label><select id="edit-emotion"><option>Neutre</option><option>Confiant</option><option>Hesitant</option><option>FOMO</option><option>Stresse</option><option>Discipline</option></select></div>
     </div>
     <div class="field" style="margin-top:10px"><label>Notes</label><textarea id="edit-notes" style="min-height:60px"></textarea></div>
+    <div class="field" style="margin-top:10px">
+      <label>Capture d'ecran entree</label>
+      <div id="edit-photo-preview" style="margin-bottom:8px"></div>
+      <div class="photo-upload-btn" onclick="document.getElementById('edit-photo-input').click()">
+        <i class="ti ti-camera" style="font-size:18px"></i> Ajouter / Remplacer capture
+      </div>
+      <input type="file" id="edit-photo-input" accept="image/*" style="display:none" onchange="editPreviewPhoto(this,'entry')">
+    </div>
+    <div class="field" style="margin-top:8px">
+      <label>Capture d'ecran sortie</label>
+      <div id="edit-photo-exit-preview" style="margin-bottom:8px"></div>
+      <div class="photo-upload-btn" onclick="document.getElementById('edit-photo-exit-input').click()">
+        <i class="ti ti-camera" style="font-size:18px"></i> Ajouter / Remplacer capture sortie
+      </div>
+      <input type="file" id="edit-photo-exit-input" accept="image/*" style="display:none" onchange="editPreviewPhoto(this,'exit')">
+    </div>
     <div class="btn-row">
       <button class="btn" onclick="closeEditModal()">Annuler</button>
       <button class="btn primary" onclick="confirmEdit()"><i class="ti ti-check"></i> Sauvegarder</button>
