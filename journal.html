@@ -647,7 +647,7 @@ function openEditModal(i){
   var t=window._tradeList?window._tradeList[i]:null;
   if(!t)t=trades.find(function(x){return (x.id||x._id||'').toString()===String(i);});
   if(!t)return;
-  var id=t.id||t._id;
+  var id=(t.id||t._id||'').toString();
   document.getElementById('edit-id').value=id;
   document.getElementById('edit-symbol').value=t.symbol||'';
   document.getElementById('edit-side').value=t.side||'BUY';
@@ -681,8 +681,9 @@ function openEditModal(i){
 }
 function closeEditModal(){document.getElementById('edit-modal').classList.remove('show');}
 function confirmEdit(){
-  var id=parseInt(document.getElementById('edit-id').value);
-  var idx=trades.findIndex(function(t){return (t.id||t._id||'').toString()===id.toString();});if(idx===-1)return;
+  var id=document.getElementById('edit-id').value;
+  var idx=trades.findIndex(function(t){return (t.id||t._id||'').toString()===id.toString();});
+  if(idx===-1){console.error('Trade not found:',id);return;}
   var pnl=parseFloat(document.getElementById('edit-pnl').value)||0;
   trades[idx]=Object.assign({},trades[idx],{symbol:(document.getElementById('edit-symbol').value||'').toUpperCase().trim(),side:document.getElementById('edit-side').value,date:document.getElementById('edit-date').value,entry:parseFloat(document.getElementById('edit-entry').value)||0,sl:parseFloat(document.getElementById('edit-sl').value)||0,tp:parseFloat(document.getElementById('edit-tp').value)||0,tp2:parseFloat(document.getElementById('edit-tp2').value)||0,size:parseFloat(document.getElementById('edit-size').value)||1,status:document.getElementById('edit-status').value,pnl:pnl,netPnl:pnl,strategy:document.getElementById('edit-strategy').value,emotion:document.getElementById('edit-emotion').value,notes:document.getElementById('edit-notes').value});
   // Save photos — null = unchanged, '' = deleted, 'data:...' = new photo
@@ -701,7 +702,7 @@ function openCloseModal(i){
   document.getElementById('modal-id').value=(id||'').toString();document.getElementById('modal-pnl').value='';document.getElementById('modal-note').value='';document.getElementById('close-modal').classList.add('show');}
 function closeModal(){document.getElementById('close-modal').classList.remove('show');}
 function confirmClose(){
-  var id=parseInt(document.getElementById('modal-id').value);
+  var id=document.getElementById('modal-id').value;
   var pnl=parseFloat(document.getElementById('modal-pnl').value)||0;
   var note=document.getElementById('modal-note').value;
   var idx=trades.findIndex(function(t){return (t.id||t._id||'').toString()===id.toString();});if(idx===-1)return;
