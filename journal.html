@@ -614,10 +614,21 @@ function renderTrades(){
     var isOpen=t.status==='open',isWin=t.pnl>0;
     var pnlColor=t.pnl>0?'var(--green)':t.pnl<0?'var(--red)':'var(--text3)';
     var netColor=net>0?'var(--green)':net<0?'var(--red)':'var(--text3)';
-    return '<tr><td style="white-space:nowrap">'+t.date+'</td><td><strong>'+t.symbol+'</strong></td><td><span class="badge '+(t.side==='BUY'?'buy':'sell')+'">'+(t.side==='BUY'?'Long':'Short')+'</span></td><td>'+(t.entry||'—')+'</td><td style="color:var(--red)">'+(t.sl||'—')+'</td><td style="color:var(--green)">'+(t.tp||'—')+'</td><td style="color:var(--green)">'+(t.tp2||'—')+'</td><td>'+(t.size||1)+'</td><td style="color:'+pnlColor+';font-weight:600">'+(t.pnl>0?'+':'')+(t.pnl?t.pnl.toFixed(2):'—')+'</td><td style="color:'+netColor+';font-weight:600">'+(net>0?'+':'')+(net?net.toFixed(2):'—')+'</td><td><span class="badge '+(isOpen?'open':isWin?'win':'loss')+'">'+(isOpen?'Ouvert':isWin?'Win':'Loss')+'</span></td><td style="font-size:11px;color:var(--text2)">'+(t.strategy||'—')+'</td><td style="font-size:11px;color:var(--text3);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(t.notes||'—')+'</td><td style="white-space:nowrap"><button class="btn" style="padding:3px 8px;font-size:11px;margin-right:4px" onclick="openEditModal('+tid+')"><i class="ti ti-pencil"></i></button>'+(isOpen?'<button class="btn success" style="padding:3px 8px;font-size:11px;margin-right:4px" onclick="openCloseModal('+tid+')"><i class="ti ti-lock"></i></button>':'')+' <button class="btn danger" style="padding:3px 8px;font-size:11px" onclick="deleteTrade('+tid+')"><i class="ti ti-trash"></i></button></td></tr>'
+    return '<tr><td style="white-space:nowrap">'+t.date+'</td><td><strong>'+t.symbol+'</strong></td><td><span class="badge '+(t.side==='BUY'?'buy':'sell')+'">'+(t.side==='BUY'?'Long':'Short')+'</span></td><td>'+(t.entry||'—')+'</td><td style="color:var(--red)">'+(t.sl||'—')+'</td><td style="color:var(--green)">'+(t.tp||'—')+'</td><td style="color:var(--green)">'+(t.tp2||'—')+'</td><td>'+(t.size||1)+'</td><td style="color:'+pnlColor+';font-weight:600">'+(t.pnl>0?'+':'')+(t.pnl?t.pnl.toFixed(2):'—')+'</td><td style="color:'+netColor+';font-weight:600">'+(net>0?'+':'')+(net?net.toFixed(2):'—')+'</td><td><span class="badge '+(isOpen?'open':isWin?'win':'loss')+'">'+(isOpen?'Ouvert':isWin?'Win':'Loss')+'</span></td><td style="font-size:11px;color:var(--text2)">'+(t.strategy||'—')+'</td><td style="font-size:11px;color:var(--text3);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(t.notes||'—')+'</td><td style="white-space:nowrap"><button class="btn btn-edit" data-id="'+ tid +'" style="padding:3px 8px;font-size:11px;margin-right:4px"><i class="ti ti-pencil"></i></button>'+(isOpen?'<button class="btn success btn-close-trade" data-id="'+ tid +'" style="padding:3px 8px;font-size:11px;margin-right:4px"><i class="ti ti-lock"></i></button>':'')+' <button class="btn danger btn-delete" data-id="'+ tid +'" style="padding:3px 8px;font-size:11px"><i class="ti ti-trash"></i></button></td></tr>'
     +(t.photo||t.photoExit?'<tr><td colspan="14" style="padding:4px 10px 8px;background:var(--bg3)"><div style="display:flex;gap:6px;align-items:center">'+(t.photo?'<img src="'+t.photo+'" onclick="showPhotoModal(this.src)" title="Photo entree" style="width:48px;height:36px;object-fit:cover;border-radius:4px;border:1px solid var(--border);cursor:zoom-in;transition:transform .15s" onmouseover="this.style.transform=\'scale(1.08)\'" onmouseout="this.style.transform=\'scale(1)\'">':'')+(t.photoExit?'<img src="'+t.photoExit+'" onclick="showPhotoModal(this.src)" title="Photo sortie" style="width:48px;height:36px;object-fit:cover;border-radius:4px;border:1px solid var(--border);cursor:zoom-in;transition:transform .15s" onmouseover="this.style.transform=\'scale(1.08)\'" onmouseout="this.style.transform=\'scale(1)\'">':'')+'</div></td></tr>':'');
   }).join('');
 }
+
+
+// Event delegation for MongoDB string IDs
+document.addEventListener('click', function(e){
+  var editBtn = e.target.closest('.btn-edit');
+  var closeBtn = e.target.closest('.btn-close-trade');
+  var delBtn = e.target.closest('.btn-delete');
+  if(editBtn){ openEditModal(editBtn.getAttribute('data-id')); }
+  if(closeBtn){ openCloseModal(closeBtn.getAttribute('data-id')); }
+  if(delBtn){ deleteTrade(delBtn.getAttribute('data-id')); }
+});
 
 function deleteTrade(id){
   if(!confirm('Supprimer ce trade ?'))return;
