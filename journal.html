@@ -440,7 +440,7 @@ tr:hover td{background:var(--bg3)}
 </nav>
 
 <script>
-var trades=JSON.parse(localStorage.getItem('tj_trades')||'[]');
+var trades=[];
 var notes=JSON.parse(localStorage.getItem('tj_notes')||'[]');
 var pendingImport=[],filterMode='all';
 var capitalChart,assetChart,winChart,radarChart;
@@ -448,14 +448,40 @@ var COMMISSION=0;
 var COLORS=['#7c3aed','#06d6a0','#3b82f6','#f59e0b','#f72585','#ec4899','#10b981','#8b5cf6'];
 var MONTHS=['Janvier','Fevrier','Mars','Avril','Mai','Juin','Juillet','Aout','Septembre','Octobre','Novembre','Decembre'];
 var calY=new Date().getFullYear(),calM=new Date().getMonth();
+var API='/api/trades';
+var loading=false;
 
-function save(){localStorage.setItem('tj_trades',JSON.stringify(trades));localStorage.setItem('tj_notes',JSON.stringify(notes));}
+function saveNotes(){localStorage.setItem('tj_notes',JSON.stringify(notes));}
 function saveBalance(){localStorage.setItem('tj_balance',document.getElementById('account-balance').value);renderDashboard();}
 function updateCount(){document.getElementById('trade-count').textContent=trades.length+' trade'+(trades.length!==1?'s':'');}
 
+// Load trades from API
+async function loadTrades(){
+  try{
+    var res=await fetch(API);
+    trades=await res.json();
+    trades.forEach(function(t){if(t._id&&!t.id)t.id=t._id.toString();});
+    updateCount();renderDashboard();
+    var page=document.querySelector('.page.active');
+    if(page&&page.id==='page-trades')renderTrades();
+  }catch(e){console.error('Load error:',e);}
+}
+
+// API helpers
+async function apiPost(data){
+  var res=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+  return await res.json();
+}
+async function apiPut(id,data){
+  await fetch(API+'/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+}
+async function apiDelete(id){
+  await fetch(API+'/'+id,{method:'DELETE'});
+}
+
 document.getElementById('f-date').value=new Date().toISOString().split('T')[0];
 var sb=localStorage.getItem('tj_balance');if(sb)document.getElementById('account-balance').value=sb;
-updateCount();
+loadTrades();
 
 var PAGE_TITLES={dashboard:'Dashboard',import:'Import CSV',add:'Nouveau trade',trades:'Historique',notes:'Notes'};
 
@@ -553,7 +579,15 @@ function saveTrade(){
   var pnl=parseFloat(document.getElementById('f-pnl').value)||0;
   var t={id:Date.now(),symbol:symbol,side:document.getElementById('f-side').value,date:document.getElementById('f-date').value,entry:parseFloat(document.getElementById('f-entry').value)||0,sl:parseFloat(document.getElementById('f-sl').value)||0,tp:parseFloat(document.getElementById('f-tp').value)||0,tp2:parseFloat(document.getElementById('f-tp2').value)||0,size:parseFloat(document.getElementById('f-size').value)||1,status:document.getElementById('f-status').value,exit:0,pnl:pnl,netPnl:pnl,strategy:document.getElementById('f-strategy').value,emotion:document.getElementById('f-emotion').value,notes:document.getElementById('f-notes').value};
   var photo=getPhotoData('f-photo-img');if(photo)t.photo=photo;
-  trades.unshift(t);save();updateCount();clearForm();showPage('trades',null);
+  apiPost(t).then(function(saved){
+    if(saved&&(saved.id||saved._id)){
+      saved.id=saved.id||saved._id.toString();
+      trades.unshift(saved);
+    } else {
+      trades.unshift(t);
+    }
+    updateCount();clearForm();showPage('trades',null);renderDashboard();
+  });
 }
 
 function clearForm(){
@@ -584,8 +618,19 @@ function renderTrades(){
   }).join('');
 }
 
-function deleteTrade(id){if(!confirm('Supprimer ce trade ?'))return;trades=trades.filter(function(t){return t.id!==id;});save();updateCount();renderTrades();renderDashboard();}
-function clearAll(){if(!confirm('Effacer TOUS les trades ?'))return;trades=[];save();updateCount();renderTrades();renderDashboard();}
+function deleteTrade(id){
+  if(!confirm('Supprimer ce trade ?'))return;
+  var tid=typeof id==='number'?String(id):id;
+  trades=trades.filter(function(t){return t.id!==tid&&t.id!==id;});
+  updateCount();renderTrades();renderDashboard();
+  apiDelete(tid).catch(function(e){console.error('Delete error:',e);loadTrades();});
+}
+function clearAll(){
+  if(!confirm('Effacer TOUS les trades ?'))return;
+  var ids=trades.map(function(t){return t.id||t._id;});
+  trades=[];updateCount();renderTrades();renderDashboard();
+  Promise.all(ids.map(function(id){return apiDelete(id);})).catch(function(e){console.error(e);});
+}
 
 function exportCSV(){
   if(!trades.length){alert('Aucun trade.');return;}
@@ -639,7 +684,9 @@ function confirmEdit(){
   if(editPhotoExit !== null) trades[idx].photoExit = editPhotoExit || undefined;
   if(editPhotoEntry === '') delete trades[idx].photo;
   if(editPhotoExit === '') delete trades[idx].photoExit;
-  save();closeEditModal();renderTrades();renderDashboard();
+  var tid=trades[idx].id||trades[idx]._id;
+  apiPut(tid,trades[idx]).catch(function(e){console.error('Update error:',e);});
+  closeEditModal();renderTrades();renderDashboard();
 }
 
 function openCloseModal(id){document.getElementById('modal-id').value=id;document.getElementById('modal-pnl').value='';document.getElementById('modal-note').value='';document.getElementById('close-modal').classList.add('show');}
@@ -650,12 +697,14 @@ function confirmClose(){
   var note=document.getElementById('modal-note').value;
   var idx=trades.findIndex(function(t){return t.id===id;});if(idx===-1)return;
   trades[idx]=Object.assign({},trades[idx],{status:'closed',pnl:pnl,netPnl:pnl,notes:(trades[idx].notes?trades[idx].notes+' | ':'')+note});
-  save();closeModal();renderTrades();renderDashboard();
+  var tid=trades[idx].id||trades[idx]._id;
+  apiPut(tid,trades[idx]).catch(function(e){console.error('Close error:',e);});
+  closeModal();renderTrades();renderDashboard();
 }
 
-function saveNote(){var txt=document.getElementById('note-input').value.trim();if(!txt)return;notes.unshift({id:Date.now(),text:txt,date:new Date().toLocaleDateString('fr-FR')});save();document.getElementById('note-input').value='';renderNotes();}
+function saveNote(){var txt=document.getElementById('note-input').value.trim();if(!txt)return;notes.unshift({id:Date.now(),text:txt,date:new Date().toLocaleDateString('fr-FR')});saveNotes();document.getElementById('note-input').value='';renderNotes();}
 function renderNotes(){var el=document.getElementById('notes-list');if(!notes.length){el.innerHTML='<p class="empty">Aucune note</p>';return;}el.innerHTML=notes.map(function(n){return'<div class="note-card">'+n.text+'<div class="note-date">'+n.date+' <button onclick="deleteNote('+n.id+')" style="border:none;background:none;color:var(--red);cursor:pointer;font-size:11px;margin-left:8px"><i class="ti ti-trash"></i></button></div></div>';}).join('');}
-function deleteNote(id){notes=notes.filter(function(n){return n.id!==id;});save();renderNotes();}
+function deleteNote(id){notes=notes.filter(function(n){return n.id!==id;});saveNotes();renderNotes();}
 
 // ─── PHOTOS DANS MODIFIER ────────────────────────────────────────
 var editPhotoEntry = null;
