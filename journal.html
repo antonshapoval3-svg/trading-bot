@@ -607,32 +607,23 @@ function renderTrades(){
   else if(filterMode==='closed')list=trades.filter(function(t){return t.status==='closed';});
   else if(filterMode==='BUY')list=trades.filter(function(t){return t.side==='BUY';});
   else if(filterMode==='SELL')list=trades.filter(function(t){return t.side==='SELL';});
-  if(!list.length){tbody.innerHTML='<tr><td colspan="14" class="empty"><i class="ti ti-database-off" style="font-size:28px;display:block;margin-bottom:8px;opacity:.4"></i>Aucun trade — importe un CSV ou saisis manuellement</td></tr>';return;}
-  tbody.innerHTML=list.map(function(t){
-    var tid=JSON.stringify(t.id||t._id||'');
+  if(!list.length){tbody.innerHTML='<tr><td colspan="14" class="empty"><i class="ti ti-database-off" style="font-size:28px;display:block;margin-bottom:8px;opacity:.4"></i>Aucun trade</td></tr>';return;}
+  window._tradeList = list;
+  tbody.innerHTML=list.map(function(t,i){
     var net=t.netPnl!=null?t.netPnl:t.pnl;
     var isOpen=t.status==='open',isWin=t.pnl>0;
     var pnlColor=t.pnl>0?'var(--green)':t.pnl<0?'var(--red)':'var(--text3)';
     var netColor=net>0?'var(--green)':net<0?'var(--red)':'var(--text3)';
-    return '<tr><td style="white-space:nowrap">'+t.date+'</td><td><strong>'+t.symbol+'</strong></td><td><span class="badge '+(t.side==='BUY'?'buy':'sell')+'">'+(t.side==='BUY'?'Long':'Short')+'</span></td><td>'+(t.entry||'—')+'</td><td style="color:var(--red)">'+(t.sl||'—')+'</td><td style="color:var(--green)">'+(t.tp||'—')+'</td><td style="color:var(--green)">'+(t.tp2||'—')+'</td><td>'+(t.size||1)+'</td><td style="color:'+pnlColor+';font-weight:600">'+(t.pnl>0?'+':'')+(t.pnl?t.pnl.toFixed(2):'—')+'</td><td style="color:'+netColor+';font-weight:600">'+(net>0?'+':'')+(net?net.toFixed(2):'—')+'</td><td><span class="badge '+(isOpen?'open':isWin?'win':'loss')+'">'+(isOpen?'Ouvert':isWin?'Win':'Loss')+'</span></td><td style="font-size:11px;color:var(--text2)">'+(t.strategy||'—')+'</td><td style="font-size:11px;color:var(--text3);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(t.notes||'—')+'</td><td style="white-space:nowrap"><button class="btn btn-edit" data-id="'+ tid +'" style="padding:3px 8px;font-size:11px;margin-right:4px"><i class="ti ti-pencil"></i></button>'+(isOpen?'<button class="btn success btn-close-trade" data-id="'+ tid +'" style="padding:3px 8px;font-size:11px;margin-right:4px"><i class="ti ti-lock"></i></button>':'')+' <button class="btn danger btn-delete" data-id="'+ tid +'" style="padding:3px 8px;font-size:11px"><i class="ti ti-trash"></i></button></td></tr>'
-    +(t.photo||t.photoExit?'<tr><td colspan="14" style="padding:4px 10px 8px;background:var(--bg3)"><div style="display:flex;gap:6px;align-items:center">'+(t.photo?'<img src="'+t.photo+'" onclick="showPhotoModal(this.src)" title="Photo entree" style="width:48px;height:36px;object-fit:cover;border-radius:4px;border:1px solid var(--border);cursor:zoom-in;transition:transform .15s" onmouseover="this.style.transform=\'scale(1.08)\'" onmouseout="this.style.transform=\'scale(1)\'">':'')+(t.photoExit?'<img src="'+t.photoExit+'" onclick="showPhotoModal(this.src)" title="Photo sortie" style="width:48px;height:36px;object-fit:cover;border-radius:4px;border:1px solid var(--border);cursor:zoom-in;transition:transform .15s" onmouseover="this.style.transform=\'scale(1.08)\'" onmouseout="this.style.transform=\'scale(1)\'">':'')+'</div></td></tr>':'');
+    return '<tr><td style="white-space:nowrap">'+t.date+'</td><td><strong>'+t.symbol+'</strong></td><td><span class="badge '+(t.side==='BUY'?'buy':'sell')+'">'+(t.side==='BUY'?'Long':'Short')+'</span></td><td>'+(t.entry||'—')+'</td><td style="color:var(--red)">'+(t.sl||'—')+'</td><td style="color:var(--green)">'+(t.tp||'—')+'</td><td style="color:var(--green)">'+(t.tp2||'—')+'</td><td>'+(t.size||1)+'</td><td style="color:'+pnlColor+';font-weight:600">'+(t.pnl>0?'+':'')+(t.pnl?t.pnl.toFixed(2):'—')+'</td><td style="color:'+netColor+';font-weight:600">'+(net>0?'+':'')+(net?net.toFixed(2):'—')+'</td><td><span class="badge '+(isOpen?'open':isWin?'win':'loss')+'">'+(isOpen?'Ouvert':isWin?'Win':'Loss')+'</span></td><td style="font-size:11px;color:var(--text2)">'+(t.strategy||'—')+'</td><td style="font-size:11px;color:var(--text3);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(t.notes||'—')+'</td><td style="white-space:nowrap"><button class="btn" style="padding:3px 8px;font-size:11px;margin-right:4px" onclick="openEditModal('+i+')"><i class="ti ti-pencil"></i></button>'+(isOpen?'<button class="btn success" style="padding:3px 8px;font-size:11px;margin-right:4px" onclick="openCloseModal('+i+')"><i class="ti ti-lock"></i></button>':'')+' <button class="btn danger" style="padding:3px 8px;font-size:11px" onclick="deleteTrade('+i+')"><i class="ti ti-trash"></i></button></td></tr>'
+    +(t.photo||t.photoExit?'<tr><td colspan="14" style="padding:4px 10px 8px;background:var(--bg3)"><div style="display:flex;gap:6px;align-items:center">'+(t.photo?'<img src="'+t.photo+'" onclick="showPhotoModal(this.src)" title="Photo entree" style="width:48px;height:36px;object-fit:cover;border-radius:4px;border:1px solid var(--border);cursor:zoom-in">':'')+(t.photoExit?'<img src="'+t.photoExit+'" onclick="showPhotoModal(this.src)" title="Photo sortie" style="width:48px;height:36px;object-fit:cover;border-radius:4px;border:1px solid var(--border);cursor:zoom-in">':'')+'</div></td></tr>':'');
   }).join('');
 }
 
 
-// Event delegation for MongoDB string IDs
-document.addEventListener('click', function(e){
-  var editBtn = e.target.closest('.btn-edit');
-  var closeBtn = e.target.closest('.btn-close-trade');
-  var delBtn = e.target.closest('.btn-delete');
-  if(editBtn){ openEditModal(editBtn.getAttribute('data-id')); }
-  if(closeBtn){ openCloseModal(closeBtn.getAttribute('data-id')); }
-  if(delBtn){ deleteTrade(delBtn.getAttribute('data-id')); }
-});
-
-function deleteTrade(id){
+function deleteTrade(i){
   if(!confirm('Supprimer ce trade ?'))return;
-  var tid=(id||'').toString();
+  var t=window._tradeList?window._tradeList[i]:null;
+  var tid=t?(t.id||t._id||'').toString():String(i);
   trades=trades.filter(function(t){return (t.id||t._id||'').toString()!==tid;});
   updateCount();renderTrades();renderDashboard();
   apiDelete(tid).catch(function(e){console.error('Delete error:',e);loadTrades();});
@@ -652,8 +643,11 @@ function exportCSV(){
   var a=document.createElement('a');a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);a.download='journal.csv';a.click();
 }
 
-function openEditModal(id){
-  var t=trades.find(function(x){return (x.id||x._id||'').toString()===id.toString();});if(!t)return;
+function openEditModal(i){
+  var t=window._tradeList?window._tradeList[i]:null;
+  if(!t)t=trades.find(function(x){return (x.id||x._id||'').toString()===String(i);});
+  if(!t)return;
+  var id=t.id||t._id;
   document.getElementById('edit-id').value=id;
   document.getElementById('edit-symbol').value=t.symbol||'';
   document.getElementById('edit-side').value=t.side||'BUY';
@@ -701,7 +695,10 @@ function confirmEdit(){
   closeEditModal();renderTrades();renderDashboard();
 }
 
-function openCloseModal(id){document.getElementById('modal-id').value=(id||'').toString();document.getElementById('modal-pnl').value='';document.getElementById('modal-note').value='';document.getElementById('close-modal').classList.add('show');}
+function openCloseModal(i){
+  var t=window._tradeList?window._tradeList[i]:null;
+  var id=t?(t.id||t._id):i;
+  document.getElementById('modal-id').value=(id||'').toString();document.getElementById('modal-pnl').value='';document.getElementById('modal-note').value='';document.getElementById('close-modal').classList.add('show');}
 function closeModal(){document.getElementById('close-modal').classList.remove('show');}
 function confirmClose(){
   var id=parseInt(document.getElementById('modal-id').value);
