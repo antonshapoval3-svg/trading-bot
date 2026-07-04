@@ -580,7 +580,7 @@ function renderTrades(){
     var pnlColor=t.pnl>0?'var(--green)':t.pnl<0?'var(--red)':'var(--text3)';
     var netColor=net>0?'var(--green)':net<0?'var(--red)':'var(--text3)';
     return '<tr><td style="white-space:nowrap">'+t.date+'</td><td><strong>'+t.symbol+'</strong></td><td><span class="badge '+(t.side==='BUY'?'buy':'sell')+'">'+(t.side==='BUY'?'Long':'Short')+'</span></td><td>'+(t.entry||'—')+'</td><td style="color:var(--red)">'+(t.sl||'—')+'</td><td style="color:var(--green)">'+(t.tp||'—')+'</td><td style="color:var(--green)">'+(t.tp2||'—')+'</td><td>'+(t.size||1)+'</td><td style="color:'+pnlColor+';font-weight:600">'+(t.pnl>0?'+':'')+(t.pnl?t.pnl.toFixed(2):'—')+'</td><td style="color:'+netColor+';font-weight:600">'+(net>0?'+':'')+(net?net.toFixed(2):'—')+'</td><td><span class="badge '+(isOpen?'open':isWin?'win':'loss')+'">'+(isOpen?'Ouvert':isWin?'Win':'Loss')+'</span></td><td style="font-size:11px;color:var(--text2)">'+(t.strategy||'—')+'</td><td style="font-size:11px;color:var(--text3);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(t.notes||'—')+'</td><td style="white-space:nowrap"><button class="btn" style="padding:3px 8px;font-size:11px;margin-right:4px" onclick="openEditModal('+t.id+')"><i class="ti ti-pencil"></i></button>'+(isOpen?'<button class="btn success" style="padding:3px 8px;font-size:11px;margin-right:4px" onclick="openCloseModal('+t.id+')"><i class="ti ti-lock"></i></button>':'')+' <button class="btn danger" style="padding:3px 8px;font-size:11px" onclick="deleteTrade('+t.id+')"><i class="ti ti-trash"></i></button></td></tr>'
-    +(t.photo||t.photoExit?'<tr><td colspan="14" style="padding:8px 12px;background:var(--bg3)">'+(t.photo?'<img src="'+t.photo+'" class="trade-photo" onclick="showPhotoModal(this.src)" title="Cliquer pour agrandir">':'')+(t.photoExit?'<img src="'+t.photoExit+'" class="trade-photo" style="margin-left:8px" onclick="showPhotoModal(this.src)">':'')+'</td></tr>':'');
+    +(t.photo||t.photoExit?'<tr><td colspan="14" style="padding:4px 10px 8px;background:var(--bg3)"><div style="display:flex;gap:6px;align-items:center">'+(t.photo?'<img src="'+t.photo+'" onclick="showPhotoModal(this.src)" title="Photo entree" style="width:48px;height:36px;object-fit:cover;border-radius:4px;border:1px solid var(--border);cursor:zoom-in;transition:transform .15s" onmouseover="this.style.transform=\'scale(1.08)\'" onmouseout="this.style.transform=\'scale(1)\'">':'')+(t.photoExit?'<img src="'+t.photoExit+'" onclick="showPhotoModal(this.src)" title="Photo sortie" style="width:48px;height:36px;object-fit:cover;border-radius:4px;border:1px solid var(--border);cursor:zoom-in;transition:transform .15s" onmouseover="this.style.transform=\'scale(1.08)\'" onmouseout="this.style.transform=\'scale(1)\'">':'')+'</div></td></tr>':'');
   }).join('');
 }
 
@@ -634,9 +634,11 @@ function confirmEdit(){
   var idx=trades.findIndex(function(t){return t.id===id;});if(idx===-1)return;
   var pnl=parseFloat(document.getElementById('edit-pnl').value)||0;
   trades[idx]=Object.assign({},trades[idx],{symbol:(document.getElementById('edit-symbol').value||'').toUpperCase().trim(),side:document.getElementById('edit-side').value,date:document.getElementById('edit-date').value,entry:parseFloat(document.getElementById('edit-entry').value)||0,sl:parseFloat(document.getElementById('edit-sl').value)||0,tp:parseFloat(document.getElementById('edit-tp').value)||0,tp2:parseFloat(document.getElementById('edit-tp2').value)||0,size:parseFloat(document.getElementById('edit-size').value)||1,status:document.getElementById('edit-status').value,pnl:pnl,netPnl:pnl,strategy:document.getElementById('edit-strategy').value,emotion:document.getElementById('edit-emotion').value,notes:document.getElementById('edit-notes').value});
-  // Save photos
-  if(editPhotoEntry !== null) trades[idx].photo = editPhotoEntry;
-  if(editPhotoExit !== null) trades[idx].photoExit = editPhotoExit;
+  // Save photos — null = unchanged, '' = deleted, 'data:...' = new photo
+  if(editPhotoEntry !== null) trades[idx].photo = editPhotoEntry || undefined;
+  if(editPhotoExit !== null) trades[idx].photoExit = editPhotoExit || undefined;
+  if(editPhotoEntry === '') delete trades[idx].photo;
+  if(editPhotoExit === '') delete trades[idx].photoExit;
   save();closeEditModal();renderTrades();renderDashboard();
 }
 
@@ -680,12 +682,12 @@ function loadEditPhoto(input, type){
 
 function removeEditPhoto(type){
   if(type === 'entry'){
-    editPhotoEntry = null;
+    editPhotoEntry = '';  // empty string = explicitly deleted
     document.getElementById('edit-photo-entry-img').src = '';
     document.getElementById('edit-photo-entry-preview').style.display = 'none';
     document.getElementById('edit-photo-entry-input').value = '';
   } else {
-    editPhotoExit = null;
+    editPhotoExit = '';   // empty string = explicitly deleted
     document.getElementById('edit-photo-exit-img').src = '';
     document.getElementById('edit-photo-exit-preview').style.display = 'none';
     document.getElementById('edit-photo-exit-input').value = '';
