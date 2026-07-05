@@ -37,11 +37,25 @@ async function sendTelegram(text){
 // ─── Extraction texte depuis réponse Claude ────────────────────────
 function extractText(content){
   if(!content||!Array.isArray(content)) return "";
-  // Cherche tous les blocs texte et les concatène
   const parts = content
     .filter(b => b.type === "text" && b.text && b.text.trim())
-    .map(b => b.text.trim());
-  return parts.join("\n\n");
+    .map(b => b.text.trim())
+    .filter(t => {
+      // Filtre les lignes d'intro de recherche web
+      if(t.startsWith("I'll search")) return false;
+      if(t.startsWith("I will search")) return false;
+      if(t.startsWith("Let me search")) return false;
+      if(t.startsWith("Searching")) return false;
+      if(t.length < 20) return false;
+      return true;
+    });
+  // Concatene et supprime aussi les lignes parasites en debut
+  let result = parts.join("\n\n");
+  result = result.replace(/^.*search.*simultaneously.*\n/i, "");
+  result = result.replace(/^.*I'll.*\n/i, "");
+  result = result.replace(/^Voici toutes les données compilées.*\n/i, "");
+  result = result.replace(/^---\n/gm, "");
+  return result.trim();
 }
 
 // ─── Briefing matinal ─────────────────────────────────────────────
