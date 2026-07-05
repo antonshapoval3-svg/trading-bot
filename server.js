@@ -56,7 +56,7 @@ async function sendMorningBriefing(){
       max_tokens:2048,
       tools:[{type:"web_search_20250305", name:"web_search"}],
       messages:[{role:"user", content:
-  "Donne-moi le prix actuel du GOLD et du DAX aujourd hui " + today + ". Reponds en francais en une seule reponse directe, sans introduction, sans markdown, sans tirets. Format exact:\n\nGOLD: [prix] - [haussier/baissier] - SL:[niveau] TP:[niveau]\nDAX: [prix] - [haussier/baissier] - SL:[niveau] TP:[niveau]\nNews: [2 news importantes]\nStrategie: [1 phrase]"
+  "Recherche le prix actuel du GOLD et DAX et le calendrier economique du " + today + ". Reponds en francais, sans markdown, sans etoiles, sans tirets. Format exact:\n\nGOLD: [prix] | [haussier/baissier/neutre]\nSupport: [niveau] | Resistance: [niveau]\nSignal: [LONG/SHORT/NEUTRE]\n\nDAX: [prix] | [haussier/baissier/neutre]\nSupport: [niveau] | Resistance: [niveau]\nSignal: [LONG/SHORT/NEUTRE]\n\nANNONCES DU JOUR\n[heure Paris] [annonce] [impact: rouge/orange/jaune]\nCourt terme: [impact sur GOLD et DAX dans les prochaines heures]\nLong terme: [impact sur GOLD et DAX dans les prochains jours/semaines]\n[repete pour chaque annonce importante]\n\nNEWS CLES\n[news 1]\n[news 2]\n\nSTRATEGIE DU JOUR\n[synthese en 2 phrases]"
       }]
     },{headers:{
       "x-api-key":ANTHROPIC_KEY,
