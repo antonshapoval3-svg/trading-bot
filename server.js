@@ -56,28 +56,7 @@ async function sendMorningBriefing(){
       max_tokens:2048,
       tools:[{type:"web_search_20250305", name:"web_search"}],
       messages:[{role:"user", content:
-        "Tu es un analyste de trading professionnel. Nous sommes le "+today+".\n\n"+
-        "Recherche sur le web le prix actuel du GOLD (XAU/USD) et du DAX (GER40) puis redige ce briefing en francais.\n\n"+
-        "BRIEFING MATINAL - "+today+"\n\n"+
-        "GOLD (XAU/USD)\n"+
-        "Prix : [prix reel]\n"+
-        "Tendance : [haussiere/baissiere/neutre]\n"+
-        "Resistance : [niveau] | Support : [niveau]\n"+
-        "Signal : [LONG/SHORT/NEUTRE]\n"+
-        "Risque : [risque principal]\n\n"+
-        "DAX (GER40)\n"+
-        "Prix : [prix reel]\n"+
-        "Tendance : [haussiere/baissiere/neutre]\n"+
-        "Resistance : [niveau] | Support : [niveau]\n"+
-        "Signal : [LONG/SHORT/NEUTRE]\n"+
-        "Risque : [risque principal]\n\n"+
-        "AGENDA DU JOUR\n"+
-        "[annonces economiques avec heure Paris]\n\n"+
-        "NEWS CLES\n"+
-        "[2-3 news importantes pour les marches]\n\n"+
-        "STRATEGIE\n"+
-        "[synthese en 2 phrases]\n\n"+
-        "Reponds uniquement avec le briefing, sans introduction ni conclusion."
+  "Donne-moi le prix actuel du GOLD et du DAX aujourd hui " + today + ". Reponds en francais en une seule reponse directe, sans introduction, sans markdown, sans tirets. Format exact:\n\nGOLD: [prix] - [haussier/baissier] - SL:[niveau] TP:[niveau]\nDAX: [prix] - [haussier/baissier] - SL:[niveau] TP:[niveau]\nNews: [2 news importantes]\nStrategie: [1 phrase]"
       }]
     },{headers:{
       "x-api-key":ANTHROPIC_KEY,
