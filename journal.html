@@ -482,6 +482,18 @@ function authHeaders(){
   return authToken ? {'Content-Type':'application/json','Authorization':'Bearer '+authToken} : {'Content-Type':'application/json'};
 }
 
+function togglePwd(){
+  var input = document.getElementById('l-pwd');
+  var icon = document.getElementById('eye-icon');
+  if(input.type === 'password'){
+    input.type = 'text';
+    icon.className = 'ti ti-eye-off';
+  } else {
+    input.type = 'password';
+    icon.className = 'ti ti-eye';
+  }
+}
+
 function switchTab(tab){
   document.querySelectorAll('.login-tab').forEach(function(t,i){t.classList.toggle('active',i===(tab==='login'?0:1));});
   document.getElementById('tab-login').style.display=tab==='login'?'block':'none';
@@ -1005,24 +1017,19 @@ renderDashboard();
       <div class="login-logo-name">TradeBot</div>
       <div class="login-logo-sub">Journal de trading</div>
     </div>
-    <div class="login-tabs">
-      <div class="login-tab active" onclick="switchTab('login')">Connexion</div>
-      <div class="login-tab" onclick="switchTab('register')">Créer un compte</div>
-    </div>
-    <!-- LOGIN -->
     <div id="tab-login">
       <div class="login-field"><label>Email</label><input id="l-email" type="email" placeholder="ton@email.com"></div>
-      <div class="login-field"><label>Mot de passe</label><input id="l-pwd" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
+      <div class="login-field">
+        <label>Mot de passe</label>
+        <div style="position:relative">
+          <input id="l-pwd" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()" style="padding-right:44px;width:100%">
+          <button onclick="togglePwd()" id="pwd-eye" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text2);font-size:18px;line-height:1;padding:0">
+            <i class="ti ti-eye" id="eye-icon"></i>
+          </button>
+        </div>
+      </div>
       <button class="login-btn" onclick="doLogin()">Se connecter</button>
       <div class="login-err" id="login-err"></div>
-    </div>
-    <!-- REGISTER -->
-    <div id="tab-register" style="display:none">
-      <div class="login-field"><label>Nom</label><input id="r-nom" type="text" placeholder="Ton prénom"></div>
-      <div class="login-field"><label>Email</label><input id="r-email" type="email" placeholder="ton@email.com"></div>
-      <div class="login-field"><label>Mot de passe</label><input id="r-pwd" type="password" placeholder="Min 6 caractères" onkeydown="if(event.key==='Enter')doRegister()"></div>
-      <button class="login-btn" onclick="doRegister()">Créer mon compte</button>
-      <div class="login-err" id="register-err"></div>
     </div>
   </div>
 </div>
