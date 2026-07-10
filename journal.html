@@ -777,12 +777,14 @@ function renderDashboard(){
   var balance=parseFloat(localStorage.getItem('tj_balance'))||0;
   var curBal=balance+totalNet;
 
+  var evVal=closed.length>0?Math.round(((wr/100)*avgWin)-((1-wr/100)*avgLoss)*100)/100:0;
   document.getElementById('kpi-main').innerHTML=
     '<div class="kpi-card"><div class="kpi-label"><i class="ti ti-trending-up" style="font-size:13px"></i> Net P&L <span style="font-size:10px;color:var(--text3)">'+closed.length+' trades</span></div><div class="kpi-val '+(totalNet<0?'red':'')+'">$'+totalNet.toFixed(2)+'</div><div class="kpi-sub">avant frais</div></div>'+
     '<div class="kpi-card purple"><div class="kpi-label"><i class="ti ti-award" style="font-size:13px"></i> Win Rate</div><div class="kpi-val '+(wr<50?'red':'')+'">'+wr+'%</div><div class="kpi-sub">'+wins.length+'W / '+losses.length+'L</div></div>'+
     '<div class="kpi-card '+(pf<1?'red':'')+'"><div class="kpi-label"><i class="ti ti-calculator" style="font-size:13px"></i> Profit Factor</div><div class="kpi-val neutral">'+(pf===999?'∞':pf.toFixed(2))+'</div><div class="kpi-sub">gains / pertes</div></div>'+
     '<div class="kpi-card blue"><div class="kpi-label"><i class="ti ti-calendar-stats" style="font-size:13px"></i> Day Win %</div><div class="kpi-val neutral">'+Math.round(Object.values(dMap).filter(function(v){return v>0;}).length/Math.max(dVals.length,1)*100)+'%</div><div class="kpi-sub">jours profitables</div></div>'+
-    '<div class="kpi-card orange"><div class="kpi-label"><i class="ti ti-scale" style="font-size:13px"></i> Avg Win/Loss</div><div class="kpi-val neutral">'+rr.toFixed(2)+'</div><div class="kpi-sub">+$'+avgWin.toFixed(0)+' / -$'+avgLoss.toFixed(0)+'</div></div>';
+    '<div class="kpi-card orange"><div class="kpi-label"><i class="ti ti-scale" style="font-size:13px"></i> Avg Win/Loss</div><div class="kpi-val neutral">'+rr.toFixed(2)+'</div><div class="kpi-sub">+$'+avgWin.toFixed(0)+' / -$'+avgLoss.toFixed(0)+'</div></div>'+
+    '<div class="kpi-card '+(evVal<0?'red':'green')+'"><div class="kpi-label"><i class="ti ti-math-function" style="font-size:13px"></i> Valeur Attendue</div><div class="kpi-val '+(evVal<0?'red':'')+'">'+( evVal>=0?'+':'')+evVal.toFixed(2)+'</div><div class="kpi-sub">par trade</div></div>';
 
   document.getElementById('kpi-advanced').innerHTML=
     '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)"><span style="font-size:11px;color:var(--text2)">Balance</span><span style="font-size:12px;font-weight:600;color:'+(curBal>=balance?'var(--green)':'var(--red)')+'">$'+curBal.toFixed(0)+'</span></div>'+
