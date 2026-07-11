@@ -987,6 +987,8 @@ function logout(){
   localStorage.removeItem('tj_user');
   sessionStorage.removeItem('tj_token');
   sessionStorage.removeItem('tj_user');
+  sessionStorage.removeItem('tj_token');
+  sessionStorage.removeItem('tj_user');
   trades = [];
   showLogin();
 }
@@ -997,7 +999,9 @@ function authHeaders(){
 
 // Init
 document.addEventListener('DOMContentLoaded', function(){
-  if(!authToken){ showLogin(); }
+  authToken = localStorage.getItem('tj_token') || sessionStorage.getItem('tj_token') || null;
+  currentUser = JSON.parse(localStorage.getItem('tj_user') || sessionStorage.getItem('tj_user') || 'null');
+  if(!authToken){ showLogin(); } else { loadTrades(); }
 });
 
 </script>
@@ -1028,6 +1032,10 @@ document.addEventListener('DOMContentLoaded', function(){
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;margin-top:2px">
       <input type="checkbox" id="remember-me" style="accent-color:#7c3aed;width:14px;height:14px;cursor:pointer">
       <label for="remember-me" style="font-size:12px;color:#444;cursor:pointer">Se souvenir de moi</label>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin:4px 0 10px">
+      <input type="checkbox" id="remember-me" style="accent-color:#7c3aed;width:14px;height:14px;cursor:pointer">
+      <label for="remember-me" style="font-size:12px;color:#444;cursor:pointer;user-select:none">Se souvenir de moi</label>
     </div>
     <button class="login-btn" onclick="doLogin()">Se connecter</button>
     <div class="login-err" id="login-err"></div>
