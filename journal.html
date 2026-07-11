@@ -472,8 +472,21 @@ var API='/api/trades';
 var loading=false;
 
 function saveNotes(){localStorage.setItem('tj_notes',JSON.stringify(notes));}
-function saveBalance(){localStorage.setItem('tj_balance',document.getElementById('account-balance').value);renderDashboard();}
-function updateCount(){document.getElementById('trade-count').textContent=trades.length+' trade'+(trades.length!==1?'s':'');}
+function saveBalance(){
+  localStorage.setItem('tj_balance',document.getElementById('account-balance').value);
+  renderDashboard();
+  updateBalanceDisplay();
+}
+function updateBalanceDisplay(){
+  var balance = parseFloat(localStorage.getItem('tj_balance'))||0;
+  var closed = trades.filter(function(t){return t.status!=='open';});
+  var totalNet = closed.reduce(function(s,t){return s+(t.netPnl||t.pnl||0);},0);
+  var curBal = balance + totalNet;
+  var el = document.getElementById('account-balance');
+  if(el && !el.matches(':focus')) el.value = curBal > 0 ? curBal.toFixed(0) : '';
+  // Update bottom balance display
+  var bottomBal = document.getElementById('bottom-balance');
+  if(bottomBal) bottomBal.textContent = 'document.getElementById('trade-count').textContent=trades.length+' trade'+(trades.length!==1?'s':'');}
 
 // Load trades from API
 async function loadTrades(){
