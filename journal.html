@@ -169,6 +169,10 @@ tr:hover td{background:var(--bg3)}
 }
 
 /* LOGIN */
+.login-tabs{display:flex;gap:0;margin-bottom:20px;border-bottom:1px solid #1c1c1c}
+.login-tab{flex:1;padding:9px;background:none;border:none;color:#333;font-size:12px;font-family:inherit;cursor:pointer;border-bottom:2px solid transparent;transition:all .2s}
+.login-tab.active{color:#fff;border-bottom-color:#7c3aed}
+
 .login-overlay{display:none;position:fixed;inset:0;background:#060606;z-index:9999;align-items:center;justify-content:center}
 .login-box{width:90%;max-width:340px;background:#0f0f0f;border:1px solid #1c1c1c;border-radius:14px;padding:30px 24px}
 .login-logo{text-align:center;margin-bottom:24px}
@@ -929,10 +933,37 @@ var currentUser = JSON.parse(localStorage.getItem('tj_user') || sessionStorage.g
 function authHeaders(){
   return {'Content-Type':'application/json', 'Authorization': authToken ? 'Bearer '+authToken : ''};
 }
-function togglePwd(){
-  var i=document.getElementById('l-pwd'), ic=document.getElementById('l-eye');
+function togglePwd(inputId,iconId){
+  var i=document.getElementById(inputId||'l-pwd');
+  var ic=document.getElementById(iconId||'l-eye');
   i.type = i.type==='password'?'text':'password';
   ic.className = i.type==='password'?'ti ti-eye':'ti ti-eye-off';
+}
+function switchLoginTab(tab){
+  document.querySelectorAll('.login-tab').forEach(function(t,i){t.classList.toggle('active',i===(tab==='login'?0:1));});
+  document.getElementById('tab-login').style.display = tab==='login'?'block':'none';
+  document.getElementById('tab-register').style.display = tab==='register'?'block':'none';
+}
+async function doRegister(){
+  var nom=document.getElementById('r-nom').value.trim();
+  var email=document.getElementById('r-email').value.trim();
+  var pwd=document.getElementById('r-pwd').value;
+  var err=document.getElementById('register-err');
+  err.style.display='none';
+  if(!nom||!email||!pwd){err.textContent='Remplis tous les champs';err.style.display='block';return;}
+  if(pwd.length<6){err.textContent='Mot de passe trop court (6 min)';err.style.display='block';return;}
+  try{
+    var res=await fetch('/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nom,email,password:pwd})});
+    var data=await res.json();
+    if(!res.ok){err.textContent=data.error||'Erreur';err.style.display='block';return;}
+    authToken=data.token;
+    currentUser={nom:data.nom,email:data.email};
+    var remember=document.getElementById('r-remember').checked;
+    if(remember){localStorage.setItem('tj_token',authToken);localStorage.setItem('tj_user',JSON.stringify(currentUser));}
+    else{sessionStorage.setItem('tj_token',authToken);sessionStorage.setItem('tj_user',JSON.stringify(currentUser));localStorage.removeItem('tj_token');localStorage.removeItem('tj_user');}
+    hideLogin();
+    loadTrades();
+  }catch(e){err.textContent='Erreur de connexion';err.style.display='block';}
 }
 function showLogin(){
   document.getElementById('login-overlay').style.display='flex';
@@ -983,17 +1014,40 @@ document.addEventListener('DOMContentLoaded',function(){
       <div class="login-logo-title">TradeBot</div>
       <div class="login-logo-sub">Journal de trading</div>
     </div>
-    <div class="lf"><label>Nom</label><input id="l-nom" type="text" placeholder="Anton" autocomplete="name"></div>
-    <div class="lf"><label>Email</label><input id="l-email" type="email" placeholder="anton@email.com" autocomplete="email"></div>
-    <div class="lf"><label>Mot de passe</label>
-      <div class="pwd-wrap">
-        <input id="l-pwd" type="password" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
-        <button class="pwd-eye" type="button" onclick="togglePwd()"><i class="ti ti-eye" id="l-eye"></i></button>
-      </div>
+    <div class="login-tabs">
+      <button class="login-tab active" onclick="switchLoginTab('login')">Se connecter</button>
+      <button class="login-tab" onclick="switchLoginTab('register')">Créer un compte</button>
     </div>
-    <label class="remember-row"><input type="checkbox" id="l-remember" checked><span>Se souvenir de moi</span></label>
-    <button class="login-btn" onclick="doLogin()">Se connecter</button>
-    <div class="login-err" id="login-err"></div>
+
+    <!-- CONNEXION -->
+    <div id="tab-login">
+      <div class="lf"><label>Nom</label><input id="l-nom" type="text" placeholder="Anton" autocomplete="name"></div>
+      <div class="lf"><label>Email</label><input id="l-email" type="email" placeholder="anton@email.com" autocomplete="email"></div>
+      <div class="lf"><label>Mot de passe</label>
+        <div class="pwd-wrap">
+          <input id="l-pwd" type="password" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+          <button class="pwd-eye" type="button" onclick="togglePwd('l-pwd','l-eye')"><i class="ti ti-eye" id="l-eye"></i></button>
+        </div>
+      </div>
+      <label class="remember-row"><input type="checkbox" id="l-remember" checked><span>Se souvenir de moi</span></label>
+      <button class="login-btn" onclick="doLogin()">Se connecter</button>
+      <div class="login-err" id="login-err"></div>
+    </div>
+
+    <!-- INSCRIPTION -->
+    <div id="tab-register" style="display:none">
+      <div class="lf"><label>Nom</label><input id="r-nom" type="text" placeholder="Prénom" autocomplete="name"></div>
+      <div class="lf"><label>Email</label><input id="r-email" type="email" placeholder="email@email.com" autocomplete="email"></div>
+      <div class="lf"><label>Mot de passe</label>
+        <div class="pwd-wrap">
+          <input id="r-pwd" type="password" placeholder="••••••••" autocomplete="new-password" onkeydown="if(event.key==='Enter')doRegister()">
+          <button class="pwd-eye" type="button" onclick="togglePwd('r-pwd','r-eye')"><i class="ti ti-eye" id="r-eye"></i></button>
+        </div>
+      </div>
+      <label class="remember-row"><input type="checkbox" id="r-remember" checked><span>Se souvenir de moi</span></label>
+      <button class="login-btn" onclick="doRegister()">Créer mon compte</button>
+      <div class="login-err" id="register-err"></div>
+    </div>
   </div>
 </div>
 </body>
