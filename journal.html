@@ -167,6 +167,25 @@ tr:hover td{background:var(--bg3)}
   .bottom-nav{display:block}
   .topbar{padding:10px 14px}
 }
+
+/* ── LOGIN ── */
+.login-overlay{position:fixed;inset:0;background:#080808;display:flex;align-items:center;justify-content:center;z-index:9999;display:none}
+.login-box{width:90%;max-width:360px;background:#0f0f0f;border:1px solid #1a1a1a;border-radius:16px;padding:32px 28px}
+.login-logo{text-align:center;margin-bottom:28px}
+.login-logo-icon{font-size:32px;color:#7c3aed;display:block;margin-bottom:8px}
+.login-title{font-size:18px;font-weight:500;color:#fff;margin-bottom:2px}
+.login-sub{font-size:12px;color:#333}
+.login-field{margin-bottom:14px}
+.login-field label{font-size:11px;color:#444;display:block;margin-bottom:5px;letter-spacing:.3px}
+.login-field input{width:100%;background:#0a0a0a;border:1px solid #1e1e1e;border-radius:8px;padding:11px 14px;font-size:13px;color:#fff;outline:none;font-family:var(--font);transition:border .2s}
+.login-field input:focus{border-color:#7c3aed}
+.login-pwd-wrap{position:relative}
+.login-pwd-wrap input{padding-right:40px}
+.login-eye{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#333;font-size:16px;padding:0;line-height:1}
+.login-btn{width:100%;padding:12px;background:#7c3aed;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;font-family:var(--font);margin-top:6px;transition:background .2s}
+.login-btn:hover{background:#6d28d9}
+.login-err{background:rgba(247,37,133,.08);border:1px solid rgba(247,37,133,.2);color:#f72585;border-radius:6px;padding:8px 12px;font-size:12px;margin-top:10px;display:none}
+.login-user{position:absolute;top:12px;right:16px;font-size:11px;color:#333;cursor:pointer;display:flex;align-items:center;gap:6px}
 </style>
 </head>
 <body>
@@ -200,6 +219,7 @@ tr:hover td{background:var(--bg3)}
     <div class="topbar-right">
       <span id="trade-count" style="font-size:12px;color:var(--text3)">0 trades</span>
       <button class="btn-add" onclick="showPage('add',null)"><i class="ti ti-plus" style="font-size:15px"></i> Add Trade</button>
+      <button onclick="logout()" title="Se déconnecter" style="background:transparent;border:1px solid #2a2a2a;border-radius:8px;padding:7px 10px;cursor:pointer;color:#444;font-size:13px;display:flex;align-items:center;gap:5px;transition:all .2s" onmouseover="this.style.borderColor='#f72585';this.style.color='#f72585'" onmouseout="this.style.borderColor='#2a2a2a';this.style.color='#444'"><i class="ti ti-logout"></i></button>
     </div>
   </div>
 
@@ -452,13 +472,27 @@ var API='/api/trades';
 var loading=false;
 
 function saveNotes(){localStorage.setItem('tj_notes',JSON.stringify(notes));}
-function saveBalance(){localStorage.setItem('tj_balance',document.getElementById('account-balance').value);renderDashboard();}
-function updateCount(){document.getElementById('trade-count').textContent=trades.length+' trade'+(trades.length!==1?'s':'');}
+function saveBalance(){
+  localStorage.setItem('tj_balance',document.getElementById('account-balance').value);
+  renderDashboard();
+  updateBalanceDisplay();
+}
+function updateBalanceDisplay(){
+  var balance = parseFloat(localStorage.getItem('tj_balance'))||0;
+  var closed = trades.filter(function(t){return t.status!=='open';});
+  var totalNet = closed.reduce(function(s,t){return s+(t.netPnl||t.pnl||0);},0);
+  var curBal = balance + totalNet;
+  var el = document.getElementById('account-balance');
+  if(el && !el.matches(':focus')) el.value = curBal > 0 ? curBal.toFixed(0) : '';
+  // Update bottom balance display
+  var bottomBal = document.getElementById('bottom-balance');
+  if(bottomBal) bottomBal.textContent = 'document.getElementById('trade-count').textContent=trades.length+' trade'+(trades.length!==1?'s':'');}
 
 // Load trades from API
 async function loadTrades(){
   try{
-    var res=await fetch(API);
+    var res=await fetch(API,{headers:authHeaders()});
+    if(res.status===401){logout();return;}
     trades=await res.json();
     trades.forEach(function(t){if(t._id&&!t.id)t.id=t._id.toString();});
     updateCount();renderDashboard();
@@ -469,14 +503,14 @@ async function loadTrades(){
 
 // API helpers
 async function apiPost(data){
-  var res=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+  var res=await fetch(API,{method:'POST',headers:authHeaders(),body:JSON.stringify(data)});
   return await res.json();
 }
 async function apiPut(id,data){
-  await fetch(API+'/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+  await fetch(API+'/'+id,{method:'PUT',headers:authHeaders(),body:JSON.stringify(data)});
 }
 async function apiDelete(id){
-  await fetch(API+'/'+id,{method:'DELETE'});
+  await fetch(API+'/'+id,{method:'DELETE',headers:authHeaders()});
 }
 
 document.getElementById('f-date').value=new Date().toISOString().split('T')[0];
@@ -898,6 +932,107 @@ function prevMonth(){calM--;if(calM<0){calM=11;calY--;}renderCalendar();}
 function nextMonth(){calM++;if(calM>11){calM=0;calY++;}renderCalendar();}
 
 renderDashboard();
+
+
+/* ── AUTH ── */
+var authToken = localStorage.getItem('tj_token') || sessionStorage.getItem('tj_token') || null;
+var currentUser = JSON.parse(localStorage.getItem('tj_user') || sessionStorage.getItem('tj_user') || 'null');
+
+function togglePwd(){
+  var i = document.getElementById('l-pwd');
+  var ic = document.getElementById('eye-icon');
+  i.type = i.type === 'password' ? 'text' : 'password';
+  ic.className = i.type === 'password' ? 'ti ti-eye' : 'ti ti-eye-off';
+}
+
+function showLogin(){
+  document.getElementById('login-overlay').style.display = 'flex';
+}
+
+function hideLogin(){
+  document.getElementById('login-overlay').style.display = 'none';
+}
+
+async function doLogin(){
+  var nom   = document.getElementById('l-nom').value.trim();
+  var email = document.getElementById('l-email').value.trim();
+  var pwd   = document.getElementById('l-pwd').value;
+  var err   = document.getElementById('login-err');
+  err.style.display = 'none';
+  if(!nom || !email || !pwd){ err.textContent='Remplis tous les champs'; err.style.display='block'; return; }
+  try{
+    var res = await fetch('/auth/login', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({nom, email, password:pwd})});
+    var data = await res.json();
+    if(!res.ok){ err.textContent = data.error || 'Identifiants incorrects'; err.style.display='block'; return; }
+    authToken = data.token;
+    currentUser = {nom: data.nom, email: data.email};
+    var remember = document.getElementById('remember-me').checked;
+    if(remember){
+      localStorage.setItem('tj_token', authToken);
+      localStorage.setItem('tj_user', JSON.stringify(currentUser));
+    } else {
+      sessionStorage.setItem('tj_token', authToken);
+      sessionStorage.setItem('tj_user', JSON.stringify(currentUser));
+      localStorage.removeItem('tj_token');
+      localStorage.removeItem('tj_user');
+    }
+    hideLogin();
+    loadTrades();
+  } catch(e){ err.textContent='Erreur de connexion'; err.style.display='block'; }
+}
+
+function logout(){
+  authToken = null; currentUser = null;
+  localStorage.removeItem('tj_token');
+  localStorage.removeItem('tj_user');
+  sessionStorage.removeItem('tj_token');
+  sessionStorage.removeItem('tj_user');
+  trades = [];
+  showLogin();
+}
+
+function authHeaders(){
+  return authToken ? {'Content-Type':'application/json','Authorization':'Bearer '+authToken} : {'Content-Type':'application/json'};
+}
+
+// Init
+document.addEventListener('DOMContentLoaded', function(){
+  if(!authToken){ showLogin(); }
+});
+
 </script>
+
+<!-- LOGIN -->
+<div class="login-overlay" id="login-overlay">
+  <div class="login-box">
+    <div class="login-logo">
+      <i class="ti ti-chart-candle login-logo-icon"></i>
+      <div class="login-title">TradeBot</div>
+      <div class="login-sub">Journal de trading</div>
+    </div>
+    <div class="login-field">
+      <label>Nom</label>
+      <input id="l-nom" type="text" placeholder="Anton" autocomplete="name">
+    </div>
+    <div class="login-field">
+      <label>Email</label>
+      <input id="l-email" type="email" placeholder="anton@email.com" autocomplete="email">
+    </div>
+    <div class="login-field">
+      <label>Mot de passe</label>
+      <div class="login-pwd-wrap">
+        <input id="l-pwd" type="password" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+        <button class="login-eye" onclick="togglePwd()" type="button"><i class="ti ti-eye" id="eye-icon"></i></button>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;margin-top:2px">
+      <input type="checkbox" id="remember-me" style="accent-color:#7c3aed;width:14px;height:14px;cursor:pointer">
+      <label for="remember-me" style="font-size:12px;color:#444;cursor:pointer">Se souvenir de moi</label>
+    </div>
+    <button class="login-btn" onclick="doLogin()">Se connecter</button>
+    <div class="login-err" id="login-err"></div>
+  </div>
+</div>
+
 </body>
 </html>
