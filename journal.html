@@ -486,7 +486,7 @@ function updateBalanceDisplay(){
   if(el && !el.matches(':focus')) el.value = curBal > 0 ? curBal.toFixed(0) : '';
   // Update bottom balance display
   var bottomBal = document.getElementById('bottom-balance');
-  if(bottomBal) bottomBal.textContent = 'document.getElementById('trade-count').textContent=trades.length+' trade'+(trades.length!==1?'s':'');}
+  if(bottomBal) bottomBal.textContent = '$'+curBal.toFixed(2);
 
 // Load trades from API
 async function loadTrades(){
