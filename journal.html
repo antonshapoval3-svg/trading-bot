@@ -250,8 +250,11 @@ tr:hover td{background:var(--bg3)}
           <div class="chart-wrap sm"><canvas id="assetChart"></canvas></div>
         </div>
         <div class="card">
-          <div class="card-title">Progression du capital <span style="font-size:11px;color:var(--text3)">% par mois</span></div>
-          <div id="capital-progression" style="display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto"></div>
+          <div class="card-title">Gain mensuel <span style="font-size:11px;color:var(--text3)">% par mois</span></div>
+          <div id="monthly-chart" style="display:flex;align-items:flex-end;gap:6px;height:160px;padding:0 4px;position:relative">
+            <div id="monthly-bars" style="display:flex;align-items:flex-end;gap:5px;height:100%;width:100%;position:relative"></div>
+          </div>
+          <div id="monthly-labels" style="display:flex;gap:5px;margin-top:4px;padding:0 4px"></div>
         </div>
       </div>
       <!-- CALENDAR -->
@@ -832,8 +835,8 @@ function renderDashboard(){
   if(assetChart)assetChart.destroy();
   assetChart=new Chart(document.getElementById('assetChart').getContext('2d'),{type:'doughnut',data:{labels:ak.length?ak:['Aucun'],datasets:[{data:ak.length?ak.map(function(k){return am[k];}):[1],backgroundColor:ak.length?ak.map(function(_,i){return COLORS[i%COLORS.length];}):['#2d3555'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{position:'bottom',labels:{font:{size:11},color:'#94a3b8',boxWidth:10,padding:10}}}}});
 
-  // Capital progression par mois
-  var balance = parseFloat(localStorage.getItem('tj_balance')) || 0;
+  // Gain mensuel bar chart
+  var balance2 = parseFloat(localStorage.getItem('tj_balance')) || 0;
   var monthMap = {};
   closed.forEach(function(t){
     var d = new Date(t.date||t.createdAt||Date.now());
@@ -842,31 +845,52 @@ function renderDashboard(){
     monthMap[key] += (t.netPnl||t.pnl||0);
   });
   var months = Object.keys(monthMap).sort();
-  var el = document.getElementById('capital-progression');
-  if(el){
+  var barsEl = document.getElementById('monthly-bars');
+  var labelsEl = document.getElementById('monthly-labels');
+  if(barsEl && labelsEl){
     if(months.length === 0){
-      el.innerHTML = '<div style="font-size:12px;color:var(--text3);text-align:center;padding:20px 0">Aucun trade fermé</div>';
+      barsEl.innerHTML = '<div style="font-size:12px;color:var(--text3);margin:auto;text-align:center">Aucun trade fermé</div>';
+      labelsEl.innerHTML = '';
     } else {
-      var runBal = balance;
-      var rows = months.map(function(m){
+      // Calculate percentages
+      var pcts = months.map(function(m){
         var pnl = monthMap[m];
-        var base = runBal - pnl;
-        var pct = base > 0 ? (pnl/base*100) : 0;
-        var pos = pnl >= 0;
-        var d = new Date(m+'-01');
-        var label = d.toLocaleDateString('fr-FR',{month:'short',year:'numeric'});
-        var barW = Math.min(Math.abs(pct)*4, 100);
-        var r = '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:0.5px solid var(--bg3)">' +
-          '<div style="font-size:11px;color:var(--text2);width:64px;flex-shrink:0">'+label+'</div>' +
-          '<div style="flex:1;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden">' +
-            '<div style="height:100%;width:'+barW+'%;background:'+(pos?'var(--green)':'var(--red)')+';border-radius:3px;transition:width .4s"></div>' +
-          '</div>' +
-          '<div style="font-size:12px;font-weight:500;color:'+(pos?'var(--green)':'var(--red)')+';width:58px;text-align:right;flex-shrink:0">'+(pos?'+':'')+pct.toFixed(1)+'%</div>' +
-          '<div style="font-size:11px;color:var(--text3);width:64px;text-align:right;flex-shrink:0">'+(pos?'+':'')+pnl.toFixed(0)+'$</div>' +
-        '</div>';
-        return r;
+        return balance2 > 0 ? pnl/balance2*100 : (pnl > 0 ? 5 : -5);
       });
-      el.innerHTML = rows.join('');
+      var maxAbs = Math.max.apply(null, pcts.map(function(p){return Math.abs(p);})) || 1;
+      var barMaxH = 120; // max bar height px
+      var zeroY = 120; // zero line at bottom
+
+      var barsHtml = '';
+      var labelsHtml = '';
+      var colW = Math.max(20, Math.min(40, Math.floor(280/months.length)));
+
+      months.forEach(function(m, i){
+        var pct = pcts[i];
+        var pos = pct >= 0;
+        var barH = Math.max(4, Math.abs(pct)/maxAbs * barMaxH);
+        var color = pos ? '#06d6a0' : '#f72585';
+        var colorDim = pos ? 'rgba(6,214,160,0.15)' : 'rgba(247,37,133,0.15)';
+        var d = new Date(m+'-01');
+        var label = d.toLocaleDateString('fr-FR',{month:'short'});
+        var pctStr = (pos?'+':'')+pct.toFixed(2)+'%';
+
+        barsHtml += '<div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;flex:1;height:100%;position:relative;cursor:pointer" title="'+label+' : '+pctStr+'">' +
+          // Tooltip on hover
+          '<div style="position:absolute;top:-28px;left:50%;transform:translateX(-50%);background:#1a1a1a;border:1px solid #2a2a2a;border-radius:4px;padding:2px 6px;font-size:9px;color:'+color+';white-space:nowrap;opacity:0;transition:opacity .2s;pointer-events:none" class="bar-tip">'+pctStr+'</div>' +
+          // Percentage label above bar
+          '<div style="font-size:9px;font-weight:500;color:'+color+';margin-bottom:3px;line-height:1">'+pctStr+'</div>' +
+          // Bar
+          '<div style="width:80%;max-width:32px;height:'+barH+'px;background:'+color+';border-radius:3px 3px 0 0;position:relative;transition:height .4s">' +
+            '<div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,0.1) 0%,transparent 100%);border-radius:3px 3px 0 0"></div>' +
+          '</div>' +
+        '</div>';
+
+        labelsHtml += '<div style="flex:1;text-align:center;font-size:9px;color:var(--text3);line-height:1.3">'+label+'</div>';
+      });
+
+      barsEl.innerHTML = barsHtml;
+      labelsEl.innerHTML = labelsHtml;
     }
   }
 
