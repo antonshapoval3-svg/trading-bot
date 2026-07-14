@@ -250,14 +250,8 @@ tr:hover td{background:var(--bg3)}
           <div class="chart-wrap sm"><canvas id="assetChart"></canvas></div>
         </div>
         <div class="card">
-          <div class="card-title">Performance Score</div>
-          <div class="score-wrap" style="margin-bottom:12px">
-            <div><div class="score-num" id="score-num">--</div><div class="score-label">Score global</div></div>
-            <div style="flex:1;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden;margin-left:12px">
-              <div id="score-bar" style="height:100%;background:linear-gradient(90deg,var(--purple),var(--blue));border-radius:3px;transition:width .5s;width:0%"></div>
-            </div>
-          </div>
-          <div class="chart-wrap sm"><canvas id="radarChart"></canvas></div>
+          <div class="card-title">Progression du capital <span style="font-size:11px;color:var(--text3)">% par mois</span></div>
+          <div id="capital-progression" style="display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto"></div>
         </div>
       </div>
       <!-- CALENDAR -->
@@ -818,8 +812,8 @@ function renderDashboard(){
 
   // Score
   var score=Math.min(100,Math.round((wr*0.4)+(Math.min(pf,3)/3*30)+(Math.min(rr,3)/3*30)));
-  document.getElementById('score-num').textContent=score||0;
-  document.getElementById('score-bar').style.width=score+'%';
+  var sn=document.getElementById('score-num'); if(sn) sn.textContent=score||0;
+  var sb=document.getElementById('score-bar'); if(sb) sb.style.width=score+'%';
 
   // Capital chart
   var sorted=closed.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);});
@@ -836,9 +830,43 @@ function renderDashboard(){
   if(assetChart)assetChart.destroy();
   assetChart=new Chart(document.getElementById('assetChart').getContext('2d'),{type:'doughnut',data:{labels:ak.length?ak:['Aucun'],datasets:[{data:ak.length?ak.map(function(k){return am[k];}):[1],backgroundColor:ak.length?ak.map(function(_,i){return COLORS[i%COLORS.length];}):['#2d3555'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{position:'bottom',labels:{font:{size:11},color:'#94a3b8',boxWidth:10,padding:10}}}}});
 
-  // Radar chart
-  if(radarChart)radarChart.destroy();
-  radarChart=new Chart(document.getElementById('radarChart').getContext('2d'),{type:'radar',data:{labels:['Win Rate','Profit Factor','R/R Ratio','Consistency','Day Win %'],datasets:[{label:'Score',data:[wr,Math.min(pf*20,100),Math.min(rr*33,100),Math.min(closed.length*5,100),Math.round(Object.values(dMap).filter(function(v){return v>0;}).length/Math.max(dVals.length,1)*100)],backgroundColor:'rgba(124,58,237,.2)',borderColor:'rgba(124,58,237,.8)',borderWidth:2,pointBackgroundColor:'#7c3aed',pointRadius:3}]},options:{responsive:true,maintainAspectRatio:false,scales:{r:{grid:{color:'rgba(255,255,255,.07)'},angleLines:{color:'rgba(255,255,255,.07)'},ticks:{display:false},pointLabels:{font:{size:10},color:'#94a3b8'}}},plugins:{legend:{display:false}}}});
+  // Capital progression par mois
+  var balance = parseFloat(localStorage.getItem('tj_balance')) || 0;
+  var monthMap = {};
+  closed.forEach(function(t){
+    var d = new Date(t.date||t.createdAt||Date.now());
+    var key = d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0');
+    if(!monthMap[key]) monthMap[key] = 0;
+    monthMap[key] += (t.netPnl||t.pnl||0);
+  });
+  var months = Object.keys(monthMap).sort();
+  var el = document.getElementById('capital-progression');
+  if(el){
+    if(months.length === 0){
+      el.innerHTML = '<div style="font-size:12px;color:var(--text3);text-align:center;padding:20px 0">Aucun trade fermé</div>';
+    } else {
+      var runBal = balance;
+      var rows = months.map(function(m){
+        var pnl = monthMap[m];
+        var base = runBal - pnl;
+        var pct = base > 0 ? (pnl/base*100) : 0;
+        var pos = pnl >= 0;
+        var d = new Date(m+'-01');
+        var label = d.toLocaleDateString('fr-FR',{month:'short',year:'numeric'});
+        var barW = Math.min(Math.abs(pct)*4, 100);
+        var r = '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:0.5px solid var(--bg3)">' +
+          '<div style="font-size:11px;color:var(--text2);width:64px;flex-shrink:0">'+label+'</div>' +
+          '<div style="flex:1;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden">' +
+            '<div style="height:100%;width:'+barW+'%;background:'+(pos?'var(--green)':'var(--red)')+';border-radius:3px;transition:width .4s"></div>' +
+          '</div>' +
+          '<div style="font-size:12px;font-weight:500;color:'+(pos?'var(--green)':'var(--red)')+';width:58px;text-align:right;flex-shrink:0">'+(pos?'+':'')+pct.toFixed(1)+'%</div>' +
+          '<div style="font-size:11px;color:var(--text3);width:64px;text-align:right;flex-shrink:0">'+(pos?'+':'')+pnl.toFixed(0)+'$</div>' +
+        '</div>';
+        return r;
+      });
+      el.innerHTML = rows.join('');
+    }
+  }
 
   renderCalendar();
 }
