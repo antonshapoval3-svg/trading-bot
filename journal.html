@@ -477,10 +477,12 @@ function updateCount(){document.getElementById('trade-count').textContent=trades
 
 // Load trades from API
 async function loadTrades(){
+  if(!authToken){showLogin();return;}
   try{
     var res=await fetch(API,{headers:authHeaders()});
     if(res.status===401){logout();return;}
-    trades=await res.json();
+    var text=await res.text();
+    try{trades=JSON.parse(text);}catch(e){console.error('Bad JSON:',text.slice(0,100));if(!authToken)showLogin();return;}
     trades.forEach(function(t){if(t._id&&!t.id)t.id=t._id.toString();});
     updateCount();renderDashboard();
     var page=document.querySelector('.page.active');
@@ -491,7 +493,7 @@ async function loadTrades(){
 // API helpers
 async function apiPost(data){
   var res=await fetch(API,{method:'POST',headers:authHeaders(),body:JSON.stringify(data)});
-  return await res.json();
+  var t=await res.text();try{return JSON.parse(t);}catch(e){return {};}
 }
 async function apiPut(id,data){
   await fetch(API+'/'+id,{method:'PUT',headers:authHeaders(),body:JSON.stringify(data)});
