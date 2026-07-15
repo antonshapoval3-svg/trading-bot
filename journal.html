@@ -168,6 +168,13 @@ tr:hover td{background:var(--bg3)}
   .topbar{padding:10px 14px}
 }
 
+/* BALANCE MODAL */
+.bal-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9998;align-items:center;justify-content:center}
+.bal-box{background:#0f0f0f;border:1px solid #1e1e1e;border-radius:14px;padding:24px;width:90%;max-width:300px;text-align:center}
+.bal-title{font-size:14px;font-weight:500;color:#fff;margin-bottom:16px}
+.bal-input{width:100%;background:#0a0a0a;border:1px solid #1e1e1e;border-radius:8px;padding:14px;font-size:24px;font-weight:500;color:#06d6a0;text-align:center;outline:none;font-family:inherit;-webkit-appearance:none}
+.bal-input:focus{border-color:#06d6a0}
+.bal-btn{width:100%;padding:12px;background:#06d6a0;color:#000;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:12px}
 /* LOGIN */
 .login-tabs{display:flex;gap:0;margin-bottom:20px;border-bottom:1px solid #1c1c1c}
 .login-tab{flex:1;padding:9px;background:none;border:none;color:#333;font-size:12px;font-family:inherit;cursor:pointer;border-bottom:2px solid transparent;transition:all .2s}
@@ -212,8 +219,11 @@ tr:hover td{background:var(--bg3)}
     <div style="font-size:11px;color:var(--text3);margin-bottom:6px">Balance du compte</div>
     <div style="display:flex;align-items:center;gap:6px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 10px">
       <i class="ti ti-wallet" style="font-size:14px;color:var(--purple)"></i>
-      <input type="number" id="account-balance" placeholder="10000" oninput="saveBalance()" style="background:transparent;border:none;font-size:14px;font-weight:600;color:var(--accent2);width:80px;outline:none">
+      <input type="number" id="account-balance" placeholder="10000" oninput="saveBalance()" 
+        inputmode="numeric" pattern="[0-9]*"
+        style="background:transparent;border:none;font-size:14px;font-weight:600;color:var(--accent2);width:80px;outline:none;-webkit-appearance:none">
       <span style="font-size:11px;color:var(--text3)">$</span>
+      <button onclick="editBalance()" style="background:none;border:none;cursor:pointer;color:var(--text3);padding:0 2px;font-size:12px" title="Modifier"><i class="ti ti-pencil"></i></button>
     </div>
   </div>
 </nav>
@@ -1056,7 +1066,30 @@ function logout(){
 }
 // Init
 document.addEventListener('DOMContentLoaded',function(){
+  var savedBal = localStorage.getItem('tj_balance');
+  if(savedBal) document.getElementById('account-balance').value = savedBal;
   if(!authToken){showLogin();}else{hideLogin();loadTrades();}
+});
+
+
+function editBalance(){
+  var cur = document.getElementById('account-balance').value || '';
+  document.getElementById('bal-input').value = cur;
+  var m = document.getElementById('bal-modal');
+  m.style.display = 'flex';
+  setTimeout(function(){ document.getElementById('bal-input').focus(); }, 100);
+}
+function confirmBalance(){
+  var val = document.getElementById('bal-input').value;
+  document.getElementById('account-balance').value = val;
+  localStorage.setItem('tj_balance', val);
+  document.getElementById('bal-modal').style.display = 'none';
+  renderDashboard();
+}
+// Close modal on backdrop click
+document.addEventListener('click', function(e){
+  var m = document.getElementById('bal-modal');
+  if(m && e.target === m) m.style.display = 'none';
 });
 
 </script>
@@ -1102,6 +1135,16 @@ document.addEventListener('DOMContentLoaded',function(){
       <button class="login-btn" onclick="doRegister()">Créer mon compte</button>
       <div class="login-err" id="register-err"></div>
     </div>
+  </div>
+</div>
+
+<!-- BALANCE MODAL -->
+<div class="bal-modal" id="bal-modal">
+  <div class="bal-box">
+    <div class="bal-title">💰 Modifier la balance</div>
+    <input class="bal-input" id="bal-input" type="number" inputmode="numeric" pattern="[0-9]*" placeholder="10000">
+    <button class="bal-btn" onclick="confirmBalance()">Confirmer</button>
+    <button onclick="document.getElementById('bal-modal').style.display='none'" style="width:100%;padding:10px;background:none;border:none;color:#444;font-size:13px;cursor:pointer;margin-top:6px;font-family:inherit">Annuler</button>
   </div>
 </div>
 </body>
