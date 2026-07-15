@@ -649,7 +649,7 @@ function renderTrades(){
   else if(filterMode==='SELL')list=trades.filter(function(t){return t.side==='SELL';});
   if(!list.length){tbody.innerHTML='<tr><td colspan="14" class="empty"><i class="ti ti-database-off" style="font-size:28px;display:block;margin-bottom:8px;opacity:.4"></i>Aucun trade — importe un CSV ou saisis manuellement</td></tr>';return;}
   tbody.innerHTML=list.map(function(t){
-    var tid=JSON.stringify(t.id||t._id||'');
+    var tid=(t.id||t._id||'').toString();
     var net=t.netPnl!=null?t.netPnl:t.pnl;
     var isOpen=t.status==='open',isWin=t.pnl>0;
     var pnlColor=t.pnl>0?'var(--green)':t.pnl<0?'var(--red)':'var(--text3)';
