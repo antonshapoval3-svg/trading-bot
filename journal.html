@@ -840,6 +840,13 @@ function renderDashboard(){
   var dAvg=dVals.length?dVals.reduce(function(s,v){return s+v;},0)/dVals.length:0;
   var balance=parseFloat(localStorage.getItem('tj_balance'))||0;
   var curBal=balance+totalNet;
+  // Update balance bar
+  var bs=document.getElementById('balance-start');
+  if(bs)bs.textContent='$'+balance.toFixed(2);
+  var bp=document.getElementById('balance-pnl');
+  if(bp){bp.textContent=(totalNet>=0?'+':'')+totalNet.toFixed(2)+'$';bp.style.color=totalNet>=0?'var(--green)':'var(--red)';}
+  var bd=document.getElementById('balance-display');
+  if(bd){bd.textContent=String.fromCharCode(36)+curBal.toFixed(2);bd.style.color=curBal>=balance?'var(--accent2)':'var(--red)';}
 
   document.getElementById('kpi-main').innerHTML=
     '<div class="kpi-card"><div class="kpi-label"><i class="ti ti-trending-up" style="font-size:13px"></i> Net P&L <span style="font-size:10px;color:var(--text3)">'+closed.length+' trades</span></div><div class="kpi-val '+(totalNet<0?'red':'')+'">$'+totalNet.toFixed(2)+'</div><div class="kpi-sub">avant frais</div></div>'+
@@ -1043,14 +1050,15 @@ function confirmBalance(){
   var balEl=document.getElementById('account-balance');if(balEl)balEl.value=val;
   localStorage.setItem('tj_balance',val);
   document.getElementById('bal-modal').style.display='none';
-  var bd=document.getElementById('balance-display');
-  if(bd)bd.textContent='$'+(parseFloat(val)||0).toFixed(0);
-  renderDashboard();
+  var bs=document.getElementById('balance-start');if(bs)bs.textContent=String.fromCharCode(36)+(parseFloat(val)||0).toFixed(2);
 }
 document.addEventListener('click',function(e){var m=document.getElementById('bal-modal');if(m&&e.target===m)m.style.display='none';});
 document.addEventListener('DOMContentLoaded',function(){
   var savedBal=localStorage.getItem('tj_balance');
-  if(savedBal){var bd=document.getElementById('balance-display');if(bd)bd.textContent='$'+(parseFloat(savedBal)||0).toFixed(0);}
+  if(savedBal){
+    var bs=document.getElementById('balance-start');if(bs)bs.textContent=String.fromCharCode(36)+(parseFloat(savedBal)||0).toFixed(2);
+    var bd=document.getElementById('balance-display');if(bd)bd.textContent=String.fromCharCode(36)+(parseFloat(savedBal)||0).toFixed(2);
+  }
   if(!authToken){showLogin();}else{hideLogin();loadTrades();}
 });
 </script>
