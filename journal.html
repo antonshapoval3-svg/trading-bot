@@ -268,6 +268,10 @@ tr:hover td{background:var(--bg3)}
           <div class="chart-wrap sm"><canvas id="assetChart"></canvas></div>
         </div>
         <div class="card">
+          <div class="card-title">Erreurs commises <span style="font-size:11px;color:var(--text3)">fréquence</span></div>
+          <div id="error-stats" style="padding:4px 0"></div>
+        </div>
+        <div class="card">
           <div class="card-title">Gain mensuel <span style="font-size:11px;color:var(--text3)">% par mois</span></div>
           <div id="monthly-bars" style="display:flex;align-items:flex-end;gap:4px;height:140px;padding:0 2px"></div>
           <div id="monthly-labels" style="display:flex;gap:4px;margin-top:4px"></div>
@@ -343,6 +347,7 @@ tr:hover td{background:var(--bg3)}
           <div class="field"><label>Gain / Perte ($)</label><input id="f-pnl" type="number" placeholder="0.00" step="any"></div>
           <div class="field"><label>Stratégie</label><select id="f-strategy"><option>EMA + VWAP</option><option>OPR + Retest</option><option>TPO / POC</option><option>Confluence Multi-TF</option><option>Breakout</option><option>Support/Résistance</option><option>Zone Fibonacci</option><option>Autre</option></select></div>
           <div class="field"><label>Émotion</label><select id="f-emotion"><option>Neutre</option><option>Confiant</option><option>Hésitant</option><option>FOMO</option><option>Stressé</option><option>Discipliné</option></select></div>
+          <div class="field"><label>Erreur commise</label><select id="f-error"><option value="">Aucune erreur ✅</option><option value="FOMO">FOMO — entré sans signal</option><option value="Revenge">Revenge trading</option><option value="Overtrading">Overtrading</option><option value="SL déplacé">SL déplacé</option><option value="TP trop tôt">Fermé trop tôt</option><option value="Taille trop grande">Taille trop grande</option><option value="Contre-trend">Contre la tendance</option><option value="Pas de setup">Pas de setup valide</option><option value="News ignorées">News ignorées</option><option value="Autre">Autre erreur</option></select></div>
         </div>
         <div class="field" style="margin-top:12px"><label>Notes</label><textarea id="f-notes" placeholder="Contexte du marché, raison d'entrée, leçon apprise..."></textarea></div>
         <div class="photo-upload-btn" onclick="document.getElementById('f-photo').click()">
@@ -412,6 +417,7 @@ tr:hover td{background:var(--bg3)}
       <div class="field"><label>P&L ($)</label><input id="edit-pnl" type="number" step="any"></div>
       <div class="field"><label>Stratégie</label><select id="edit-strategy"><option>EMA + VWAP</option><option>OPR + Retest</option><option>TPO / POC</option><option>Confluence Multi-TF</option><option>Breakout</option><option>Support/Résistance</option><option>Zone Fibonacci</option><option>Autre</option></select></div>
       <div class="field"><label>Émotion</label><select id="edit-emotion"><option>Neutre</option><option>Confiant</option><option>Hésitant</option><option>FOMO</option><option>Stressé</option><option>Discipliné</option></select></div>
+      <div class="field"><label>Erreur commise</label><select id="edit-error"><option value="">Aucune erreur ✅</option><option value="FOMO">FOMO — entré sans signal</option><option value="Revenge">Revenge trading</option><option value="Overtrading">Overtrading</option><option value="SL déplacé">SL déplacé</option><option value="TP trop tôt">Fermé trop tôt</option><option value="Taille trop grande">Taille trop grande</option><option value="Contre-trend">Contre la tendance</option><option value="Pas de setup">Pas de setup valide</option><option value="News ignorées">News ignorées</option><option value="Autre">Autre erreur</option></select></div>
     </div>
     <div class="field" style="margin-top:10px"><label>Notes</label><textarea id="edit-notes" style="min-height:60px"></textarea></div>
     <!-- PHOTOS EDIT -->
@@ -617,7 +623,7 @@ function saveTrade(){
   var symbol=(document.getElementById('f-symbol').value||'').toUpperCase().trim();
   if(!symbol){alert('Entre un actif !');return;}
   var pnl=parseFloat(document.getElementById('f-pnl').value)||0;
-  var t={id:Date.now(),symbol:symbol,side:document.getElementById('f-side').value,date:document.getElementById('f-date').value,entry:parseFloat(document.getElementById('f-entry').value)||0,sl:parseFloat(document.getElementById('f-sl').value)||0,tp:parseFloat(document.getElementById('f-tp').value)||0,tp2:parseFloat(document.getElementById('f-tp2').value)||0,size:parseFloat(document.getElementById('f-size').value)||1,status:document.getElementById('f-status').value,exit:0,pnl:pnl,netPnl:pnl,strategy:document.getElementById('f-strategy').value,emotion:document.getElementById('f-emotion').value,notes:document.getElementById('f-notes').value};
+  var t={id:Date.now(),symbol:symbol,side:document.getElementById('f-side').value,date:document.getElementById('f-date').value,entry:parseFloat(document.getElementById('f-entry').value)||0,sl:parseFloat(document.getElementById('f-sl').value)||0,tp:parseFloat(document.getElementById('f-tp').value)||0,tp2:parseFloat(document.getElementById('f-tp2').value)||0,size:parseFloat(document.getElementById('f-size').value)||1,status:document.getElementById('f-status').value,exit:0,pnl:pnl,netPnl:pnl,strategy:document.getElementById('f-strategy').value,emotion:document.getElementById('f-emotion').value,error:document.getElementById('f-error').value,notes:document.getElementById('f-notes').value};
   var photo=getPhotoData('f-photo-img');if(photo)t.photo=photo;
   apiPost(t).then(function(saved){
     if(saved&&(saved.id||saved._id)){
@@ -729,6 +735,7 @@ function openEditModal(id){
   document.getElementById('edit-pnl').value=t.pnl||'';
   document.getElementById('edit-strategy').value=t.strategy||'EMA + VWAP';
   document.getElementById('edit-emotion').value=t.emotion||'Neutre';
+  var editErr=document.getElementById('edit-error');if(editErr)editErr.value=t.error||'';
   document.getElementById('edit-notes').value=t.notes||'';
   // Load existing photos
   editPhotoEntry = t.photo || null;
@@ -752,7 +759,7 @@ function confirmEdit(){
   var id=(document.getElementById('edit-id').value||'').toString();
   var idx=trades.findIndex(function(t){return (t.id||t._id||'').toString()===id.toString();});if(idx===-1)return;
   var pnl=parseFloat(document.getElementById('edit-pnl').value)||0;
-  trades[idx]=Object.assign({},trades[idx],{symbol:(document.getElementById('edit-symbol').value||'').toUpperCase().trim(),side:document.getElementById('edit-side').value,date:document.getElementById('edit-date').value,entry:parseFloat(document.getElementById('edit-entry').value)||0,sl:parseFloat(document.getElementById('edit-sl').value)||0,tp:parseFloat(document.getElementById('edit-tp').value)||0,tp2:parseFloat(document.getElementById('edit-tp2').value)||0,size:parseFloat(document.getElementById('edit-size').value)||1,status:document.getElementById('edit-status').value,pnl:pnl,netPnl:pnl,strategy:document.getElementById('edit-strategy').value,emotion:document.getElementById('edit-emotion').value,notes:document.getElementById('edit-notes').value});
+  trades[idx]=Object.assign({},trades[idx],{symbol:(document.getElementById('edit-symbol').value||'').toUpperCase().trim(),side:document.getElementById('edit-side').value,date:document.getElementById('edit-date').value,entry:parseFloat(document.getElementById('edit-entry').value)||0,sl:parseFloat(document.getElementById('edit-sl').value)||0,tp:parseFloat(document.getElementById('edit-tp').value)||0,tp2:parseFloat(document.getElementById('edit-tp2').value)||0,size:parseFloat(document.getElementById('edit-size').value)||1,status:document.getElementById('edit-status').value,pnl:pnl,netPnl:pnl,strategy:document.getElementById('edit-strategy').value,emotion:document.getElementById('edit-emotion').value,error:document.getElementById('edit-error').value,notes:document.getElementById('edit-notes').value});
   // Save photos — null = unchanged, '' = deleted, 'data:...' = new photo
   if(editPhotoEntry !== null) trades[idx].photo = editPhotoEntry || undefined;
   if(editPhotoExit !== null) trades[idx].photoExit = editPhotoExit || undefined;
@@ -766,7 +773,7 @@ function confirmEdit(){
 function openCloseModal(id){document.getElementById('modal-id').value=(id||'').toString();document.getElementById('modal-pnl').value='';document.getElementById('modal-note').value='';document.getElementById('close-modal').classList.add('show');}
 function closeModal(){document.getElementById('close-modal').classList.remove('show');}
 function confirmClose(){
-  var id=parseInt(document.getElementById('modal-id').value);
+  var id=(document.getElementById('modal-id').value||'').toString();
   var pnl=parseFloat(document.getElementById('modal-pnl').value)||0;
   var note=document.getElementById('modal-note').value;
   var idx=trades.findIndex(function(t){return (t.id||t._id||'').toString()===id.toString();});if(idx===-1)return;
@@ -879,6 +886,31 @@ function renderDashboard(){
   var am={};trades.forEach(function(t){am[t.symbol]=(am[t.symbol]||0)+1;});var ak=Object.keys(am);
   if(assetChart)assetChart.destroy();
   assetChart=new Chart(document.getElementById('assetChart').getContext('2d'),{type:'doughnut',data:{labels:ak.length?ak:['Aucun'],datasets:[{data:ak.length?ak.map(function(k){return am[k];}):[1],backgroundColor:ak.length?ak.map(function(_,i){return COLORS[i%COLORS.length];}):['#2d3555'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{position:'bottom',labels:{font:{size:11},color:'#94a3b8',boxWidth:10,padding:10}}}}});
+
+  // Stats erreurs
+  var errMap={};
+  closed.forEach(function(t){if(t.error&&t.error!==''){errMap[t.error]=(errMap[t.error]||0)+1;}});
+  var errEl=document.getElementById('error-stats');
+  if(errEl){
+    var errKeys=Object.keys(errMap).sort(function(a,b){return errMap[b]-errMap[a];});
+    if(!errKeys.length){errEl.innerHTML='<div style="font-size:12px;color:var(--text3);text-align:center;padding:16px 0">Aucune erreur enregistrée ✅</div>';}
+    else{
+      var total=errKeys.reduce(function(s,k){return s+errMap[k];},0);
+      errEl.innerHTML=errKeys.map(function(k){
+        var pct=Math.round(errMap[k]/total*100);
+        var barW=Math.max(4,pct);
+        return '<div style="margin-bottom:8px">'+
+          '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px">'+
+            '<span style="color:var(--text2)">'+k+'</span>'+
+            '<span style="color:var(--text3)">'+errMap[k]+'x ('+pct+'%)</span>'+
+          '</div>'+
+          '<div style="height:6px;background:var(--bg3);border-radius:3px;overflow:hidden">'+
+            '<div style="height:100%;width:'+barW+'%;background:#f72585;border-radius:3px;transition:width .4s"></div>'+
+          '</div>'+
+        '</div>';
+      }).join('');
+    }
+  }
 
   // Gain mensuel
   var monthMap={};
