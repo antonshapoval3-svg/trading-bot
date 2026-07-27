@@ -136,6 +136,13 @@ app.delete("/api/trades/:id", auth, async (req, res) => {
 
 // ── BRIEFING ──
 async function sendMorningBriefing() {
+  // Pas d'envoi le week-end (samedi=6, dimanche=0)
+  const now = new Date();
+  const day = now.getDay();
+  if (day === 0 || day === 6) {
+    console.log("Week-end — pas de briefing aujourd'hui.");
+    return;
+  }
   const today = new Date().toLocaleDateString("fr-FR", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
   console.log("Briefing du " + today + "...");
   try {
