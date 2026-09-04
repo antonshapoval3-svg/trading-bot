@@ -521,34 +521,33 @@ function parseCSV(file){
     if(lines.length<2){showErr('Fichier CSV vide.');return;}
     var isNT=lines[0].includes(';')&&(lines[0].includes('Instrument')||lines[0].includes('nstrument')||lines[0].includes('Action'));
     if(isNT){
-      // NinjaTrader Historique des trades format:
-      // 0=Instrument, 1=Action, 2=Qté, 3=Prix, 4=Heure, 5=ID, 6=Entrée/Sortie, 7=Position, 8=ID ordre, 9=Entry/Exit, 10=Commission, 11=Taux, 12=Compte
+      // NinjaTrader Historique des trades
+      // Col 6: EntrÃ©e/Sortie (Entrée/Sortie encodé Windows-1252)
+      // Col 9: Entry / Target1 / Target2 / Stop1 / Stop2 / Fermer...
       var rows=[];
       for(var i=1;i<lines.length;i++){
         var cols=lines[i].split(';').map(function(x){return x.trim().replace(/\r/g,'');});
         if(cols.length<7)continue;
         rows.push(cols);
       }
-      // Entry = col 9 contains 'entry' OR col 6 contains 'entr'
+      // Entry = col 9 === 'Entry'
       var entries=rows.filter(function(r){
-        var c6=(r[6]||'').toLowerCase();
-        var c9=(r[9]||'').toLowerCase();
-        return c9==='entry'||c6.includes('entr');
+        return (r[9]||'').trim()==='Entry';
       });
-      // Exit = col 9 contains 'exit' OR col 6 contains 'sort'
+      // Exit = col 6 contient 'sort' (Sortie) - col 9 peut être Target1, Stop1, Fermer etc.
       var exits=rows.filter(function(r){
         var c6=(r[6]||'').toLowerCase();
         var c9=(r[9]||'').toLowerCase();
-        return c9==='exit'||c6.includes('sort');
+        return c6.includes('sort')||c9.includes('target')||c9.includes('stop')||c9.includes('fermer')||c9.includes('close')||c9==='exit';
       });
-      if(!entries.length){showErr('Aucun trade Entry trouvé. Vérifiez le fichier Historique des trades NinjaTrader.');return;}
+      if(!entries.length){showErr('Aucun trade Entry trouvé.');return;}
       var trades=[];
       var usedExits=[];
       entries.forEach(function(en){
         var instrument=(en[0]||'MGC').replace(/ \d{2}-\d{2}/,'').trim();
         var acct=en[12]||'';
         var entryTime=en[4]||'';
-        // Find matching exit: same instrument, same account, after entry time
+        // Find matching exit
         var exit=null;
         for(var j=0;j<exits.length;j++){
           if(usedExits.indexOf(j)>-1)continue;
