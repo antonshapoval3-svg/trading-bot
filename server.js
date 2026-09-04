@@ -127,6 +127,25 @@ app.put("/api/trades/:id", auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// BULK DELETE all trades for user
+app.delete("/api/trades", auth, async (req, res) => {
+  try {
+    const result = await db.collection("trades").deleteMany({ userId: req.user.id });
+    res.json({ deleted: result.deletedCount });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// BULK INSERT trades
+app.post("/api/trades/bulk", auth, async (req, res) => {
+  try {
+    const trades = req.body;
+    if (!Array.isArray(trades)) return res.status(400).json({ error: "Array required" });
+    const docs = trades.map(t => ({ ...t, userId: req.user.id, createdAt: new Date() }));
+    const result = await db.collection("trades").insertMany(docs);
+    res.json({ inserted: result.insertedCount });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.delete("/api/trades/:id", auth, async (req, res) => {
   try {
     await col("trades").deleteOne({ _id: new ObjectId(req.params.id), userId: req.userId });

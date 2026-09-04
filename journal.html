@@ -609,23 +609,19 @@ function parseCSV(file){
       }
 
       if(!trades.length){showErr('Aucun trade trouvé.');return;}
-      var added=0;
-      var doNext=function(i){
-        if(i>=trades.length){
-          showSuccess(added+' / '+trades.length+' trades NinjaTrader importés !');
-          loadTrades();return;
-        }
-        setTimeout(function(){
-          apiPost(trades[i]).then(function(res){
-            if(res&&(res._id||res.id)){added++;}
-            doNext(i+1);
-          }).catch(function(e){
-            console.error('Import error trade',i,e);
-            doNext(i+1);
-          });
-        },50);
-      };
-      doNext(0);
+      // Bulk insert - une seule requête
+      fetch(API+'/bulk',{
+        method:'POST',
+        headers:authHeaders(),
+        body:JSON.stringify(trades)
+      }).then(function(r){return r.json();})
+      .then(function(res){
+        showSuccess((res.inserted||trades.length)+' trades NinjaTrader importés !');
+        loadTrades();
+      }).catch(function(e){
+        console.error('Bulk import error:',e);
+        showErr('Erreur import. Réessayez.');
+      });
     } else {
       var headers=lines[0].split(',').map(function(h){return h.replace(/"/g,'').trim().toLowerCase();});
       var parsed=[];
@@ -1023,23 +1019,10 @@ function showAlert(type,msg){var el=document.getElementById('alert-box');if(el){
 function clearAndImport(file){
   if(!file)return;
   if(!confirm('Effacer TOUS les trades et importer ce fichier NinjaTrader ?'))return;
-  var errEl=document.getElementById('import-err-msg');
-  var okEl=document.getElementById('import-ok-msg');
-  var errBox=document.getElementById('import-err');
-  var okBox=document.getElementById('import-ok');
-  if(okBox)okBox.style.display='none';
-  if(errBox)errBox.style.display='none';
-  fetch(API,{headers:authHeaders()}).then(function(r){return r.text();}).then(function(txt){
-    var ts=[];try{ts=JSON.parse(txt);}catch(e){};
-    var ids=ts.map(function(t){return t._id||t.id;}).filter(Boolean);
-    if(!ids.length){parseCSV(file);return;}
-    var i=0;
-    function del(){
-      if(i>=ids.length){parseCSV(file);return;}
-      fetch(API+'/'+ids[i],{method:'DELETE',headers:authHeaders()}).then(function(){i++;del();}).catch(function(){i++;del();});
-    }
-    del();
-  }).catch(function(){parseCSV(file);});
+  // Use bulk delete then bulk import
+  fetch(API,{method:'DELETE',headers:authHeaders()})
+  .then(function(){parseCSV(file);})
+  .catch(function(){parseCSV(file);});
 }
 </script>
 
