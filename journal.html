@@ -1063,129 +1063,108 @@ function parseExcelFile(file, callback){
 }
 
 function parseNTExcel(rows){
-  // SheetJS reads Excel - dates become numbers or Date objects
-  // Col indices: 0=Instrument,1=Action,2=Qty,3=Prix,4=Heure,5=ID,6=E/X,7=Position,8=IDOrdre,9=Nom,10=Commission,11=Taux,12=Compte
+  // SheetJS sheet_to_json {header:1}: dates become Excel serial numbers (float)
+  // Col: 0=Instrument,1=Action,2=Qty,3=Prix,4=Heure(serial),5=ID,6=E/X,7=Pos,8=IDOrdre,9=Nom,12=Compte
 
-  // Skip header row (row 0), data starts row 1
-  var dataRows = [];
-  for(var i=1; i<rows.length; i++){
-    var row = rows[i];
-    if(!row || !row[0]) continue;
-    // Skip Externe
-    if((row[9]||'').toString().trim().toLowerCase() === 'externe') continue;
-    dataRows.push(row);
+  function parsePrice(val){
+    if(typeof val==='number')return val;
+    return parseFloat((val||'0').toString().replace(',','.'))||0;
   }
 
-  if(!dataRows.length){ showErr('Aucune donnée trouvée dans le fichier Excel.'); return; }
+  function serialToDate(serial){
+    // Excel serial: days since 1899-12-30
+    if(!serial||typeof serial!=='number')return{date:'',time:''};
+    var d=new Date(Math.round((serial-25569)*86400*1000));
+    // Adjust for timezone
+    var dd=d.getUTCFullYear()+'-'+('0'+(d.getUTCMonth()+1)).slice(-2)+'-'+('0'+d.getUTCDate()).slice(-2);
+    var tt=('0'+d.getUTCHours()).slice(-2)+':'+('0'+d.getUTCMinutes()).slice(-2);
+    return{date:dd,time:tt};
+  }
 
-  // Sequential parse
-  var trades = [];
-  var idx = 0;
-  while(idx < dataRows.length){
-    var row = dataRows[idx];
-    var ex = (row[6]||'').toString().toLowerCase();
-    var nom = (row[9]||'').toString().trim();
+  function parseHeure(val){
+    if(typeof val==='number')return serialToDate(val);
+    var s=(val||'').toString();
+    if(s.includes('T')){
+      try{var d=new Date(s);return{date:d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2),time:('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)};}catch(e){}
+    }
+    var pts=s.split(' ');
+    var dateStr='';
+    if(pts[0]){var dp=pts[0].split('/');if(dp.length===3)dateStr=dp[2]+'-'+dp[1].padStart(2,'0')+'-'+dp[0].padStart(2,'0');else dateStr=pts[0];}
+    return{date:dateStr,time:pts[1]||''};
+  }
 
-    // Entry detection: col 6 contains 'entr' AND col 9 === 'Entry'
-    if((ex.includes('entr') || ex.includes('entr')) && nom === 'Entry'){
-      // Collect consecutive Entry rows
-      var entryRows = [];
-      while(idx < dataRows.length){
-        var r = dataRows[idx];
-        var rx = (r[6]||'').toString().toLowerCase();
-        var rn = (r[9]||'').toString().trim();
-        if((rx.includes('entr')) && rn === 'Entry'){ entryRows.push(r); idx++; }
+  // Filter out header row if present, and Externe rows
+  var dataRows=rows.filter(function(r,i){
+    if(i===0&&(r[0]||'').toString().toLowerCase()==='instrument')return false;
+    if((r[9]||'').toString().trim().toLowerCase()==='externe')return false;
+    return !!(r[0]);
+  });
+
+  if(!dataRows.length){showErr('Aucune donnée trouvée.');return;}
+
+  var trades=[],idx2=0;
+  while(idx2<dataRows.length){
+    var row=dataRows[idx2];
+    var ex=(row[6]||'').toString().toLowerCase();
+    var nom=(row[9]||'').toString().trim();
+
+    if(ex.includes('entr')&&nom==='Entry'){
+      var entryRows=[];
+      while(idx2<dataRows.length){
+        var r=dataRows[idx2];
+        if((r[6]||'').toString().toLowerCase().includes('entr')&&(r[9]||'').toString().trim()==='Entry'){entryRows.push(r);idx2++;}
         else break;
       }
-      // Collect exit rows until next Entry
-      var exitRows = [];
-      while(idx < dataRows.length){
-        var r = dataRows[idx];
-        var rx = (r[6]||'').toString().toLowerCase();
-        var rn = (r[9]||'').toString().trim();
-        if(!rx.includes('entr') || rn !== 'Entry'){ exitRows.push(r); idx++; }
+      var exitRows=[];
+      while(idx2<dataRows.length){
+        var r=dataRows[idx2];
+        var rx=(r[6]||'').toString().toLowerCase();
+        var rn=(r[9]||'').toString().trim();
+        if(!rx.includes('entr')||rn!=='Entry'){exitRows.push(r);idx2++;}
         else break;
       }
 
-      // Parse price - Excel gives string like "4518,6" or number
-      function parsePrice(val){
-        if(typeof val === 'number') return val;
-        return parseFloat((val||'0').toString().replace(',','.')) || 0;
-      }
+      var instr=(entryRows[0][0]||'MGC').toString().replace(/ \d{2}-\d{2}/,'').trim();
+      var action=(entryRows[0][1]||'').toString().toLowerCase();
+      var side=action.includes('acheter')||action.includes('buy')?'BUY':'SELL';
+      var sumEp=entryRows.reduce(function(s,r){return s+parsePrice(r[3]);},0);
+      var avgEp=sumEp/entryRows.length;
+      var totalQty=entryRows.reduce(function(s,r){return s+(parseInt(r[2])||0);},0);
+      var mul=instr.includes('MGC')?10:instr.includes('MNQ')?2:1;
 
-      // Parse date - Excel gives datetime object serialized as string by SheetJS
-      function parseDate(val){
-        if(!val) return {date:'', time:''};
-        var s = val.toString();
-        // SheetJS formats: "2026-08-28T18:22:37.320Z" or "28/08/2026 18:22:37"
-        if(s.includes('T') || s.includes('-')){
-          try{
-            var d = new Date(s);
-            if(!isNaN(d.getTime())){
-              var dd = d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);
-              var tt = ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);
-              return {date:dd, time:tt};
-            }
-          }catch(e){}
-        }
-        // String format DD/MM/YYYY HH:MM:SS
-        var parts = s.split(' ');
-        var dateStr = '';
-        if(parts[0]){
-          var dp = parts[0].split('/');
-          if(dp.length===3) dateStr = dp[2]+'-'+dp[1].padStart(2,'0')+'-'+dp[0].padStart(2,'0');
-          else dateStr = parts[0];
-        }
-        return {date: dateStr, time: parts[1]||''};
-      }
-
-      var instr = (entryRows[0][0]||'MGC').toString().replace(/ \d{2}-\d{2}/,'').trim();
-      var action = (entryRows[0][1]||'').toString().toLowerCase();
-      var side = action.includes('acheter')||action.includes('buy') ? 'BUY' : 'SELL';
-      var sumEp = entryRows.reduce(function(s,r){ return s + parsePrice(r[3]); }, 0);
-      var avgEp = sumEp / entryRows.length;
-      var totalQty = entryRows.reduce(function(s,r){ return s + (parseInt(r[2])||0); }, 0);
-      var mul = instr.includes('MGC') ? 10 : instr.includes('MNQ') ? 2 : 1;
-
-      var totalPnl = 0, lastXp = 0;
-      exitRows.forEach(function(ex){
-        var xp = parsePrice(ex[3]);
-        var xqty = parseInt(ex[2])||1;
-        totalPnl += side==='BUY' ? (xp-avgEp)*xqty*mul : (avgEp-xp)*xqty*mul;
-        lastXp = xp;
+      var totalPnl=0,lastXp=0;
+      exitRows.forEach(function(ex2){
+        var xp=parsePrice(ex2[3]);
+        var xqty=parseInt(ex2[2])||1;
+        totalPnl+=side==='BUY'?(xp-avgEp)*xqty*mul:(avgEp-xp)*xqty*mul;
+        lastXp=xp;
       });
-      totalPnl = Math.round(totalPnl*100)/100;
+      totalPnl=Math.round(totalPnl*100)/100;
 
-      var dt = parseDate(entryRows[0][4]);
-      var hr = dt.time ? parseInt(dt.time.split(':')[0]) : 12;
-      var session = hr>=8&&hr<10 ? 'Europe' : (hr>=15&&hr<18 ? 'US' : 'Autre');
-      var symbol = instr.includes('MNQ') ? 'NAS100' : 'GOLD';
+      var dt=parseHeure(entryRows[0][4]);
+      var hr=dt.time?parseInt(dt.time.split(':')[0]):12;
+      var session=hr>=8&&hr<10?'Europe':hr>=15&&hr<18?'US':'Autre';
+      var symbol=instr.includes('MNQ')?'NAS100':'GOLD';
+      var acct=(entryRows[0][12]||'').toString();
 
       trades.push({
-        date: dt.date, symbol: symbol, side: side,
-        lots: totalQty/100, entry: Math.round(avgEp*100)/100,
-        exit: lastXp||null, pnl: totalPnl, netPnl: totalPnl,
-        status: exitRows.length>0 ? 'closed' : 'open',
-        session: session, emotion: 'Neutre', error: ''
+        date:dt.date,symbol:symbol,side:side,
+        lots:totalQty/100,entry:Math.round(avgEp*100)/100,
+        exit:lastXp||null,pnl:totalPnl,netPnl:totalPnl,
+        status:exitRows.length>0?'closed':'open',
+        session:session,emotion:'Neutre',error:'',
+        account:acct
       });
-    } else { idx++; }
+    } else { idx2++; }
   }
 
-  if(!trades.length){ showErr('Aucun trade Entry trouvé dans le fichier Excel.'); return; }
-  console.log('Trades parsed:', trades.length, 'Total PnL:', trades.reduce(function(s,t){return s+t.pnl;},0));
+  if(!trades.length){showErr('Aucun trade Entry trouvé. Vérifiez que le fichier vient de Historique des trades NinjaTrader.');return;}
+  console.log('Trades parsés:',trades.length,'PnL total:',trades.reduce(function(s,t){return s+t.pnl;},0).toFixed(2));
 
-  // Bulk insert
-  fetch(API+'/bulk',{
-    method:'POST',
-    headers:authHeaders(),
-    body:JSON.stringify(trades)
-  }).then(function(r){return r.json();})
-  .then(function(res){
-    showSuccess((res.inserted||trades.length)+' trades importés depuis Excel NinjaTrader !');
-    loadTrades();
-  }).catch(function(e){
-    showErr('Erreur import: '+e.message);
-  });
+  fetch(API+'/bulk',{method:'POST',headers:authHeaders(),body:JSON.stringify(trades)})
+  .then(function(r){return r.json();})
+  .then(function(res){showSuccess((res.inserted||trades.length)+' trades importés depuis Excel NinjaTrader !');loadTrades();})
+  .catch(function(e){showErr('Erreur import: '+e.message);});
 }
 
 </script>
