@@ -521,14 +521,14 @@ function parseCSV(file){
     if(lines.length<2){showErr('Fichier CSV vide.');return;}
     var isNT=lines[0].includes(';')&&(lines[0].includes('Instrument')||lines[0].includes('nstrument')||lines[0].includes('Action'));
     if(isNT){
-      var headers=lines[0].split(';').map(function(h){return h.replace(/[\uFEFF\u200B]/g,'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');});
+      var headers=lines[0].split(';').map(function(h){return h.replace(/[\uFEFF\u200B]/g,'').trim().toLowerCase();});
       var rows=[];
       for(var i=1;i<lines.length;i++){var cols=lines[i].split(';').map(function(x){return x.trim();});if(cols.length<5)continue;var row={};headers.forEach(function(h,j){row[h]=cols[j]||'';});rows.push(row);}
-      var executed=rows.filter(function(r){var st=(r['etat']||r['état']||r['state']||'').toLowerCase();return st.includes('cut');});
-      var entryRows=executed.filter(function(r){var nom=(r['nom']||r['name']||'').toLowerCase().trim();return nom==='entry';});
+      var executed=rows.filter(function(r){var keys=Object.keys(r);var etatKey=keys.find(function(k){return k.includes('tat')||k==='etat';});var st=etatKey?(r[etatKey]||'').toLowerCase():'';return st.includes('cut')||st.includes('xecut');});
+      var entryRows=executed.filter(function(r){var nomKey=Object.keys(r).find(function(k){return k==='nom'||k==='name';});var nom=nomKey?(r[nomKey]||'').toLowerCase().trim():'';return nom==='entry';});
       var trades=[];
       entryRows.forEach(function(entry){
-        var entryTime=entry['heure']||entry['time']||entry['date']||''||'';
+        var entryTime=entry['heure']||entry['time']||''||'';
         var instrument=(entry['instrument']||entry['symbol']||'MGC').replace(/ \d{2}-\d{2}/,'').trim();
         var action=(entry['action']||entry['type']||'').toLowerCase();
         var qty=parseInt(entry['éxécuté']||entry['execute']||1)||1;
@@ -558,7 +558,7 @@ function parseCSV(file){
       var added=0;var doNext=function(i){if(i>=parsed.length){showSuccess(added+' trades importés !');loadTrades();return;}apiPost(parsed[i]).then(function(){added++;doNext(i+1);}).catch(function(){doNext(i+1);});};doNext(0);
     }
   };
-  r.readAsText(file,'UTF-8');
+  r.readAsText(file,'windows-1252');
 }
 var authToken=localStorage.getItem('tj_token')||sessionStorage.getItem('tj_token')||null;
 var currentUser=JSON.parse(localStorage.getItem('tj_user')||sessionStorage.getItem('tj_user')||'null');
