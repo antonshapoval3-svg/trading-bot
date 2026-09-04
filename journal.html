@@ -283,7 +283,9 @@ tr:hover td{background:var(--bg3)}
         <input type="file" id="csv-file" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleFile(event)">
         <div style="margin-top:12px;padding-top:12px;border-top:0.5px solid var(--border)">
           <div style="font-size:12px;color:var(--text3);margin-bottom:8px">🎯 NinjaTrader — Import propre (efface tout avant)</div>
-          <button onclick="document.getElementById('nt-file').click()" style="width:100%;padding:11px;background:var(--red);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;opacity:.85">🗑️ Vider + Importer NinjaTrader</button>
+          <button onclick="document.getElementById('nt-add-file').click()" style="width:100%;padding:11px;background:var(--green);color:#000;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;margin-bottom:8px">➕ Ajouter les trades du jour</button>
+          <input type="file" id="nt-add-file" accept=".csv,.xlsx,.xls" style="display:none" onchange="addTrades(this.files[0])">
+          <button onclick="document.getElementById('nt-file').click()" style="width:100%;padding:11px;background:var(--red);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;opacity:.85">🗑️ Vider tout + Importer NinjaTrader</button>
           <input type="file" id="nt-file" accept=".csv,.xlsx,.xls" style="display:none" onchange="clearAndImport(this.files[0])">
         </div>
         <div class="alert-box success" id="import-ok"><i class="ti ti-check"></i> <span id="import-ok-msg"></span></div>
@@ -1177,6 +1179,76 @@ function bulkInsert(trades, onSuccess){
   }
   sendChunk();
 }
+
+function addTrades(file){
+  if(!file)return;
+  if(file.name.endsWith('.xlsx')||file.name.endsWith('.xls')){
+    parseExcelFile(file, function(rows){ parseNTExcelAdd(rows); });
+  } else {
+    parseCSVAdd(file);
+  }
+}
+
+function parseCSVAdd(file){
+  hideAlerts();
+  var r=new FileReader();
+  r.onload=function(e){
+    var text=e.target.result;
+    var lines=text.split('\n').map(function(l){return l.trim().replace(/\r/g,'');}).filter(function(l){return l;});
+    if(lines.length<2){showErr('Fichier vide.');return;}
+    var sep=lines[0].includes(';')?';':',';
+    var headers=lines[0].split(sep).map(function(h){return h.trim().toLowerCase();});
+    var isNTReport=headers.some(function(h){return h.includes('entrée')||h.includes('entree')||h.includes('profit');});
+    if(!isNTReport){showErr('Format non reconnu. Utilisez le rapport NinjaTrader.');return;}
+
+    var trades=[];
+    for(var i=1;i<lines.length;i++){
+      var cols=lines[i].split(sep).map(function(x){return x.trim();});
+      if(cols.length<12||!cols[1])continue;
+      var profitStr=(cols[12]||'0').replace(/[^0-9,.-]/g,'').replace(',','.');
+      var profit=parseFloat(profitStr)||0;
+      var ep=parseFloat((cols[6]||'0').replace(',','.'))||0;
+      var xp=parseFloat((cols[7]||'0').replace(',','.'))||0;
+      var heureStr=cols[8]||'';
+      var dateStr='',timeStr='';
+      if(heureStr){
+        var pts=heureStr.split(' ');
+        if(pts[0]){var dp=pts[0].split('/');if(dp.length===3)dateStr=dp[2]+'-'+dp[1].padStart(2,'0')+'-'+dp[0].padStart(2,'0');else dateStr=pts[0];}
+        timeStr=pts[1]||'';
+      }
+      var dir=(cols[4]||'').toLowerCase();
+      var side=dir.includes('long')||dir.includes('buy')?'BUY':'SELL';
+      var instr=(cols[1]||'').replace(/ \d{2}-\d{2}/,'').trim();
+      var symbol=instr.includes('MNQ')||instr.includes('NQ')?'NAS100':instr.includes('MGC')||instr.includes('GC')?'GOLD':instr;
+      var hr=timeStr?parseInt(timeStr.split(':')[0]):12;
+      var session=hr>=8&&hr<10?'Europe':hr>=15&&hr<18?'US':'Autre';
+      var qty=parseInt(cols[5])||1;
+      trades.push({
+        date:dateStr,symbol:symbol,side:side,
+        lots:qty/100,entry:ep,exit:xp,
+        pnl:profit,netPnl:profit,
+        status:'closed',session:session,
+        emotion:'Neutre',error:'',
+        entryTime:timeStr,tp2:timeStr
+      });
+    }
+
+    if(!trades.length){showErr('Aucun trade trouvé.');return;}
+
+    // Add without clearing
+    bulkInsert(trades, function(n){
+      showSuccess(n+' trades ajoutés !');
+      loadTrades();
+    });
+  };
+  r.readAsText(file,'windows-1252');
+}
+
+function parseNTExcelAdd(rows){
+  // Same as parseNTExcel but without clearing
+  parseNTExcel(rows); // parseNTExcel already uses bulkInsert without clearing
+}
+
 </script>
 
 <div id="login-overlay" style="display:none;position:fixed;inset:0;background:#060606;z-index:9999;align-items:center;justify-content:center">
