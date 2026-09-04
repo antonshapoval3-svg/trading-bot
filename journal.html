@@ -283,7 +283,7 @@ tr:hover td{background:var(--bg3)}
         <input type="file" id="csv-file" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleFile(event)">
         <div style="margin-top:12px;padding-top:12px;border-top:0.5px solid var(--border)">
           <div style="font-size:12px;color:var(--text3);margin-bottom:8px">🎯 NinjaTrader — Import propre (efface tout avant)</div>
-          <button onclick="document.getElementById('nt-file').click()" style="width:100%;padding:11px;background:var(--red);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;opacity:.85">🗑️ Vider + Importer NinjaTrader (Excel ou CSV)</button>
+          <button onclick="document.getElementById('nt-file').click()" style="width:100%;padding:11px;background:var(--red);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;opacity:.85">🗑️ Vider + Importer NinjaTrader</button>
           <input type="file" id="nt-file" accept=".csv,.xlsx,.xls" style="display:none" onchange="clearAndImport(this.files[0])">
         </div>
         <div class="alert-box success" id="import-ok"><i class="ti ti-check"></i> <span id="import-ok-msg"></span></div>
@@ -531,112 +531,94 @@ function parseCSV(file){
   var r=new FileReader();
   r.onload=function(e){
     var text=e.target.result;
-    var lines=text.split('\n').map(function(l){return l.trim();}).filter(function(l){return l;});
-    if(lines.length<2){showErr('Fichier CSV vide.');return;}
-    var isNT=lines[0].includes(';')&&(lines[0].includes('Instrument')||lines[0].includes('nstrument')||lines[0].includes('Action'));
-    if(isNT){
-      // NinjaTrader Historique des trades - Parser séquentiel
-      // Col: 0=Instrument,1=Action,2=Qté,3=Prix,4=Heure,6=Entrée/Sortie,9=Entry/Stop1/Target1...
-      var rows=[];
-      for(var i=1;i<lines.length;i++){
-        var cols=lines[i].split(';').map(function(x){return x.trim().replace(/\r/g,'');});
-        if(cols.length<7)continue;
-        // Ignore lignes Externe
-        if((cols[9]||'').toLowerCase()==='externe')continue;
-        rows.push(cols);
-      }
+    var lines=text.split('\n').map(function(l){return l.trim().replace(/\r/g,'');}).filter(function(l){return l;});
+    if(lines.length<2){showErr('Fichier vide.');return;}
 
+    var sep=lines[0].includes(';')?';':',';
+    var headers=lines[0].split(sep).map(function(h){return h.trim().toLowerCase();});
+
+    // Detect NinjaTrader Performance Report format
+    // Has: instrument, prix d'entrée, prix de sortie, profit, heure d'entrée
+    var isNTReport = headers.some(function(h){return h.includes('entrée')||h.includes('entree')||h.includes('profit');});
+
+    if(isNTReport){
+      // NinjaTrader Performance Report - each row = 1 complete trade
+      // Cols: 0=Num, 1=Instrument, 2=Compte, 3=Stratégie, 4=Direction, 5=Qté,
+      //       6=Prix entrée, 7=Prix sortie, 8=Heure entrée, 9=Heure sortie,
+      //       10=Nom entrée, 11=Nom sortie, 12=Profit
       var trades=[];
-      var idx=0;
-      while(idx<rows.length){
-        var row=rows[idx];
-        var c6=(row[6]||'').toLowerCase();
-        var c9=(row[9]||'').trim();
+      for(var i=1;i<lines.length;i++){
+        var cols=lines[i].split(sep).map(function(x){return x.trim();});
+        if(cols.length<12)continue;
+        if(!cols[1])continue; // no instrument
 
-        if(c6.includes('entr')&&c9==='Entry'){
-          // Collecte toutes les lignes Entry consécutives (même trade)
-          var entryRows=[];
-          while(idx<rows.length){
-            var r=rows[idx];
-            var r6=(r[6]||'').toLowerCase();
-            var r9=(r[9]||'').trim();
-            if(r6.includes('entr')&&r9==='Entry'){
-              entryRows.push(r);idx++;
-            } else break;
-          }
+        // Parse profit: "-12,50 $" -> -12.50
+        var profitStr=(cols[12]||'0').replace(/[^0-9,.-]/g,'').replace(',','.');
+        var profit=parseFloat(profitStr)||0;
 
-          // Collecte toutes les lignes Sortie suivantes jusqu'à la prochaine Entry
-          var exitRows=[];
-          while(idx<rows.length){
-            var r=rows[idx];
-            var r6=(r[6]||'').toLowerCase();
-            var r9=(r[9]||'').trim();
-            if(!r6.includes('entr')||r9!=='Entry'){
-              exitRows.push(r);idx++;
-            } else break;
-          }
+        // Parse prices
+        var ep=parseFloat((cols[6]||'0').replace(',','.'))||0;
+        var xp=parseFloat((cols[7]||'0').replace(',','.'))||0;
 
-          // Calcul du trade
-          var instr=(entryRows[0][0]||'MGC').replace(/ \d{2}-\d{2}/,'').trim();
-          var action=(entryRows[0][1]||'').toLowerCase();
-          var side=action.includes('acheter')||action.includes('buy')?'BUY':'SELL';
-          var totalQty=entryRows.reduce(function(s,r){return s+(parseInt(r[2])||0);},0);
-          var sumEp=entryRows.reduce(function(s,r){return s+(parseFloat((r[3]||'0').replace(',','.'))||0);},0);
-          var avgEp=entryRows.length?sumEp/entryRows.length:0;
-          var mul=instr.includes('MGC')?10:instr.includes('MNQ')?2:1;
-
-          var totalPnl=0,lastXp=0;
-          exitRows.forEach(function(ex){
-            var xp=parseFloat((ex[3]||'0').replace(',','.'))||0;
-            var xqty=parseInt(ex[2])||1;
-            totalPnl+=side==='BUY'?(xp-avgEp)*xqty*mul:(avgEp-xp)*xqty*mul;
-            lastXp=xp;
-          });
-          totalPnl=Math.round(totalPnl*100)/100;
-
-          var entryTime=entryRows[0][4]||'';
-          var dateStr='';
-          if(entryTime){
-            var pts=entryTime.split(' ');
-            if(pts[0]){var dp=pts[0].split('/');if(dp.length===3)dateStr=dp[2]+'-'+dp[1].padStart(2,'0')+'-'+dp[0].padStart(2,'0');}
-          }
-          var timeStr=(entryTime.split(' ')[1]||'');
-          var hr=timeStr?parseInt(timeStr.split(':')[0]):12;
-          var session=hr>=8&&hr<10?'Europe':hr>=15&&hr<18?'US':'Autre';
-          var symbol=instr.includes('MNQ')?'NAS100':'GOLD';
-
-          trades.push({
-            date:dateStr,symbol:symbol,side:side,
-            lots:totalQty/100,entry:Math.round(avgEp*100)/100,
-            exit:lastXp||null,pnl:totalPnl,netPnl:totalPnl,
-            status:exitRows.length>0?'closed':'open',
-            session:session,emotion:'Neutre',error:''
-          });
-        } else {
-          idx++; // skip orphan rows
+        // Parse date from heure d'entrée: "04/09/2026 14:32:38"
+        var heureStr=cols[8]||'';
+        var dateStr='',timeStr='';
+        if(heureStr){
+          var pts=heureStr.split(' ');
+          if(pts[0]){var dp=pts[0].split('/');if(dp.length===3)dateStr=dp[2]+'-'+dp[1].padStart(2,'0')+'-'+dp[0].padStart(2,'0');else dateStr=pts[0];}
+          timeStr=pts[1]||'';
         }
+
+        // Direction: "Court" = SHORT = SELL, "Long" = BUY
+        var dir=(cols[4]||'').toLowerCase();
+        var side=dir.includes('long')||dir.includes('buy')?'BUY':'SELL';
+
+        // Instrument
+        var instr=(cols[1]||'').replace(/ \d{2}-\d{2}/,'').trim();
+        var symbol=instr.includes('MNQ')||instr.includes('NQ')?'NAS100':instr.includes('MGC')||instr.includes('GC')?'GOLD':instr;
+
+        var hr=timeStr?parseInt(timeStr.split(':')[0]):12;
+        var session=hr>=8&&hr<10?'Europe':hr>=15&&hr<18?'US':'Autre';
+        var qty=parseInt(cols[5])||1;
+        var compte=(cols[2]||'').trim();
+
+        trades.push({
+          date:dateStr,symbol:symbol,side:side,
+          lots:qty/100,entry:ep,exit:xp,
+          pnl:profit,netPnl:profit,
+          status:'closed',session:session,
+          emotion:'Neutre',error:'',
+          strategy:(cols[3]||'').trim()
+        });
       }
 
-      if(!trades.length){showErr('Aucun trade trouvé.');return;}
-      // Bulk insert - une seule requête
-      fetch(API+'/bulk',{
-        method:'POST',
-        headers:authHeaders(),
-        body:JSON.stringify(trades)
-      }).then(function(r){return r.json();})
-      .then(function(res){
-        showSuccess((res.inserted||trades.length)+' trades NinjaTrader importés !');
-        loadTrades();
-      }).catch(function(e){
-        console.error('Bulk import error:',e);
-        showErr('Erreur import. Réessayez.');
-      });
+      if(!trades.length){showErr('Aucun trade trouvé dans le rapport.');return;}
+
+      fetch(API+'/bulk',{method:'POST',headers:authHeaders(),body:JSON.stringify(trades)})
+      .then(function(r){return r.json();})
+      .then(function(res){showSuccess((res.inserted||trades.length)+' trades importés !');loadTrades();})
+      .catch(function(e){showErr('Erreur: '+e.message);});
+
     } else {
-      var headers=lines[0].split(',').map(function(h){return h.replace(/"/g,'').trim().toLowerCase();});
+      // Other CSV formats (TradingView etc)
       var parsed=[];
-      for(var i=1;i<lines.length;i++){var cols=lines[i].split(',').map(function(x){return x.replace(/"/g,'').trim();});if(cols.length<4)continue;var row={};headers.forEach(function(h,j){row[h]=cols[j]||'';});var pnl=parseFloat(row['profit']||row['p&l']||row['pnl']||0);parsed.push({date:row['date']||'',symbol:row['symbol']||'GOLD',side:(row['type']||row['direction']||'BUY').toUpperCase().includes('SELL')?'SELL':'BUY',lots:parseFloat(row['size']||row['lots']||0.1),entry:parseFloat(row['entry']||row['price']||0),exit:parseFloat(row['exit']||0),pnl:pnl,netPnl:pnl,status:'closed',emotion:'Neutre',error:''});}
+      for(var i=1;i<lines.length;i++){
+        var cols=lines[i].split(sep).map(function(x){return x.replace(/"/g,'').trim();});
+        if(cols.length<4)continue;
+        var row={};headers.forEach(function(h,j){row[h]=cols[j]||'';});
+        var pnl=parseFloat(row['profit']||row['p&l']||row['pnl']||0);
+        parsed.push({date:row['date']||'',symbol:row['symbol']||'GOLD',
+          side:(row['type']||row['direction']||'BUY').toUpperCase().includes('SELL')?'SELL':'BUY',
+          lots:parseFloat(row['size']||row['lots']||0.1),
+          entry:parseFloat(row['entry']||row['price']||0),
+          exit:parseFloat(row['exit']||0),
+          pnl:pnl,netPnl:pnl,status:'closed',emotion:'Neutre',error:''});
+      }
       if(!parsed.length){showErr('Aucun trade trouvé.');return;}
-      var added=0;var doNext=function(i){if(i>=parsed.length){showSuccess(added+' trades importés !');loadTrades();return;}apiPost(parsed[i]).then(function(){added++;doNext(i+1);}).catch(function(){doNext(i+1);});};doNext(0);
+      fetch(API+'/bulk',{method:'POST',headers:authHeaders(),body:JSON.stringify(parsed)})
+      .then(function(r){return r.json();})
+      .then(function(res){showSuccess((res.inserted||parsed.length)+' trades importés !');loadTrades();})
+      .catch(function(e){showErr('Erreur: '+e.message);});
     }
   };
   r.readAsText(file,'windows-1252');
@@ -1063,108 +1045,59 @@ function parseExcelFile(file, callback){
 }
 
 function parseNTExcel(rows){
-  // SheetJS sheet_to_json {header:1}: dates become Excel serial numbers (float)
-  // Col: 0=Instrument,1=Action,2=Qty,3=Prix,4=Heure(serial),5=ID,6=E/X,7=Pos,8=IDOrdre,9=Nom,12=Compte
+  // NT Performance Report Excel format - each row = 1 complete trade
+  // Row 0 = headers, Row 1+ = data
+  // Cols: 0=Num, 1=Instrument, 2=Compte, 3=Stratégie, 4=Direction,
+  //       5=Qté, 6=Prix entrée, 7=Prix sortie, 8=Heure entrée,
+  //       9=Heure sortie, 10=Nom entrée, 11=Nom sortie, 12=Profit
 
   function parsePrice(val){
     if(typeof val==='number')return val;
-    return parseFloat((val||'0').toString().replace(',','.'))||0;
+    return parseFloat((val||'0').toString().replace(/[^0-9,.-]/g,'').replace(',','.'))||0;
   }
-
-  function serialToDate(serial){
-    // Excel serial: days since 1899-12-30
-    if(!serial||typeof serial!=='number')return{date:'',time:''};
-    var d=new Date(Math.round((serial-25569)*86400*1000));
-    // Adjust for timezone
-    var dd=d.getUTCFullYear()+'-'+('0'+(d.getUTCMonth()+1)).slice(-2)+'-'+('0'+d.getUTCDate()).slice(-2);
-    var tt=('0'+d.getUTCHours()).slice(-2)+':'+('0'+d.getUTCMinutes()).slice(-2);
-    return{date:dd,time:tt};
-  }
-
   function parseHeure(val){
-    if(typeof val==='number')return serialToDate(val);
-    var s=(val||'').toString();
-    if(s.includes('T')){
-      try{var d=new Date(s);return{date:d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2),time:('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)};}catch(e){}
+    if(!val)return{date:'',time:''};
+    if(typeof val==='number'){
+      var d=new Date(Math.round((val-25569)*86400*1000));
+      return{date:d.getUTCFullYear()+'-'+('0'+(d.getUTCMonth()+1)).slice(-2)+'-'+('0'+d.getUTCDate()).slice(-2),
+             time:('0'+d.getUTCHours()).slice(-2)+':'+('0'+d.getUTCMinutes()).slice(-2)};
     }
+    var s=val.toString();
     var pts=s.split(' ');
     var dateStr='';
     if(pts[0]){var dp=pts[0].split('/');if(dp.length===3)dateStr=dp[2]+'-'+dp[1].padStart(2,'0')+'-'+dp[0].padStart(2,'0');else dateStr=pts[0];}
     return{date:dateStr,time:pts[1]||''};
   }
 
-  // Filter out header row if present, and Externe rows
-  var dataRows=rows.filter(function(r,i){
-    if(i===0&&(r[0]||'').toString().toLowerCase()==='instrument')return false;
-    if((r[9]||'').toString().trim().toLowerCase()==='externe')return false;
-    return !!(r[0]);
-  });
-
-  if(!dataRows.length){showErr('Aucune donnée trouvée.');return;}
-
-  var trades=[],idx2=0;
-  while(idx2<dataRows.length){
-    var row=dataRows[idx2];
-    var ex=(row[6]||'').toString().toLowerCase();
-    var nom=(row[9]||'').toString().trim();
-
-    if(ex.includes('entr')&&nom==='Entry'){
-      var entryRows=[];
-      while(idx2<dataRows.length){
-        var r=dataRows[idx2];
-        if((r[6]||'').toString().toLowerCase().includes('entr')&&(r[9]||'').toString().trim()==='Entry'){entryRows.push(r);idx2++;}
-        else break;
-      }
-      var exitRows=[];
-      while(idx2<dataRows.length){
-        var r=dataRows[idx2];
-        var rx=(r[6]||'').toString().toLowerCase();
-        var rn=(r[9]||'').toString().trim();
-        if(!rx.includes('entr')||rn!=='Entry'){exitRows.push(r);idx2++;}
-        else break;
-      }
-
-      var instr=(entryRows[0][0]||'MGC').toString().replace(/ \d{2}-\d{2}/,'').trim();
-      var action=(entryRows[0][1]||'').toString().toLowerCase();
-      var side=action.includes('acheter')||action.includes('buy')?'BUY':'SELL';
-      var sumEp=entryRows.reduce(function(s,r){return s+parsePrice(r[3]);},0);
-      var avgEp=sumEp/entryRows.length;
-      var totalQty=entryRows.reduce(function(s,r){return s+(parseInt(r[2])||0);},0);
-      var mul=instr.includes('MGC')?10:instr.includes('MNQ')?2:1;
-
-      var totalPnl=0,lastXp=0;
-      exitRows.forEach(function(ex2){
-        var xp=parsePrice(ex2[3]);
-        var xqty=parseInt(ex2[2])||1;
-        totalPnl+=side==='BUY'?(xp-avgEp)*xqty*mul:(avgEp-xp)*xqty*mul;
-        lastXp=xp;
-      });
-      totalPnl=Math.round(totalPnl*100)/100;
-
-      var dt=parseHeure(entryRows[0][4]);
-      var hr=dt.time?parseInt(dt.time.split(':')[0]):12;
-      var session=hr>=8&&hr<10?'Europe':hr>=15&&hr<18?'US':'Autre';
-      var symbol=instr.includes('MNQ')?'NAS100':'GOLD';
-      var acct=(entryRows[0][12]||'').toString();
-
-      trades.push({
-        date:dt.date,symbol:symbol,side:side,
-        lots:totalQty/100,entry:Math.round(avgEp*100)/100,
-        exit:lastXp||null,pnl:totalPnl,netPnl:totalPnl,
-        status:exitRows.length>0?'closed':'open',
-        session:session,emotion:'Neutre',error:'',
-        account:acct
-      });
-    } else { idx2++; }
+  var trades=[];
+  for(var i=1;i<rows.length;i++){
+    var row=rows[i];
+    if(!row||!row[1])continue;
+    var profit=parsePrice(row[12]);
+    var ep=parsePrice(row[6]);
+    var xp=parsePrice(row[7]);
+    var dt=parseHeure(row[8]);
+    var dir=(row[4]||'').toString().toLowerCase();
+    var side=dir.includes('long')||dir.includes('buy')?'BUY':'SELL';
+    var instr=(row[1]||'').toString().replace(/ \d{2}-\d{2}/,'').trim();
+    var symbol=instr.includes('MNQ')||instr.includes('NQ')?'NAS100':instr.includes('MGC')||instr.includes('GC')?'GOLD':instr;
+    var hr=dt.time?parseInt(dt.time.split(':')[0]):12;
+    var session=hr>=8&&hr<10?'Europe':hr>=15&&hr<18?'US':'Autre';
+    trades.push({
+      date:dt.date,symbol:symbol,side:side,
+      lots:(parseInt(row[5])||1)/100,entry:ep,exit:xp,
+      pnl:profit,netPnl:profit,status:'closed',
+      session:session,emotion:'Neutre',error:''
+    });
   }
 
-  if(!trades.length){showErr('Aucun trade Entry trouvé. Vérifiez que le fichier vient de Historique des trades NinjaTrader.');return;}
-  console.log('Trades parsés:',trades.length,'PnL total:',trades.reduce(function(s,t){return s+t.pnl;},0).toFixed(2));
+  if(!trades.length){showErr('Aucun trade trouvé dans le fichier Excel.');return;}
+  console.log('Trades:',trades.length,'Total PnL:',trades.reduce(function(s,t){return s+t.pnl;},0).toFixed(2));
 
   fetch(API+'/bulk',{method:'POST',headers:authHeaders(),body:JSON.stringify(trades)})
   .then(function(r){return r.json();})
-  .then(function(res){showSuccess((res.inserted||trades.length)+' trades importés depuis Excel NinjaTrader !');loadTrades();})
-  .catch(function(e){showErr('Erreur import: '+e.message);});
+  .then(function(res){showSuccess((res.inserted||trades.length)+' trades importés depuis Excel !');loadTrades();})
+  .catch(function(e){showErr('Erreur: '+e.message);});
 }
 
 </script>
