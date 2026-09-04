@@ -1063,131 +1063,117 @@ function parseExcelFile(file, callback){
 }
 
 function parseNTExcel(rows){
-  // Find header row - look for row containing 'Instrument' or 'Action'
-  var headerRow = -1;
-  for(var i=0;i<Math.min(rows.length,10);i++){
-    var r = rows[i].join(';').toLowerCase();
-    if(r.includes('instrument')||r.includes('action')){headerRow=i;break;}
-  }
-  if(headerRow===-1){showErr('En-tête non trouvé dans le fichier Excel NinjaTrader.');return;}
+  // SheetJS reads Excel - dates become numbers or Date objects
+  // Col indices: 0=Instrument,1=Action,2=Qty,3=Prix,4=Heure,5=ID,6=E/X,7=Position,8=IDOrdre,9=Nom,10=Commission,11=Taux,12=Compte
 
-  // Get headers
-  var headers = rows[headerRow].map(function(h){return (h||'').toString().trim().toLowerCase();});
-  
-  // Find column indices
-  var iInstr = headers.findIndex(function(h){return h.includes('instrument');});
-  var iAction = headers.findIndex(function(h){return h==='action'||h.includes('action');});
-  var iQty = headers.findIndex(function(h){return h.includes('quantit')||h==='qty';});
-  var iPrix = headers.findIndex(function(h){return h==='prix'||h.includes('price')||h.includes('prix');});
-  var iHeure = headers.findIndex(function(h){return h==='heure'||h.includes('time')||h.includes('heure');});
-  var iEX = headers.findIndex(function(h){return h.includes('e / x')||h==='e/x'||h.includes('e /');});
-  var iNom = headers.findIndex(function(h){return h==='nom'||h==='name';});
-  var iCompte = headers.findIndex(function(h){return h==='compte'||h.includes('account');});
-
-  console.log('Headers found:', {iInstr,iAction,iQty,iPrix,iHeure,iEX,iNom,iCompte});
-
-  // Parse data rows
+  // Skip header row (row 0), data starts row 1
   var dataRows = [];
-  for(var i=headerRow+1;i<rows.length;i++){
+  for(var i=1; i<rows.length; i++){
     var row = rows[i];
-    if(!row||!row[iInstr||0])continue;
+    if(!row || !row[0]) continue;
+    // Skip Externe
+    if((row[9]||'').toString().trim().toLowerCase() === 'externe') continue;
     dataRows.push(row);
   }
 
-  // Filter out Externe
-  dataRows = dataRows.filter(function(r){
-    return (r[iNom]||'').toString().toLowerCase()!=='externe';
-  });
+  if(!dataRows.length){ showErr('Aucune donnée trouvée dans le fichier Excel.'); return; }
 
-  // Sequential parse - same as CSV parser
+  // Sequential parse
   var trades = [];
   var idx = 0;
   while(idx < dataRows.length){
     var row = dataRows[idx];
-    var ex = (row[iEX]||'').toString().toLowerCase();
-    var nom = (row[iNom]||'').toString().trim();
+    var ex = (row[6]||'').toString().toLowerCase();
+    var nom = (row[9]||'').toString().trim();
 
-    if(ex.includes('entr') && nom==='Entry'){
-      // Collect all consecutive Entry rows
+    // Entry detection: col 6 contains 'entr' AND col 9 === 'Entry'
+    if((ex.includes('entr') || ex.includes('entr')) && nom === 'Entry'){
+      // Collect consecutive Entry rows
       var entryRows = [];
       while(idx < dataRows.length){
         var r = dataRows[idx];
-        var rx = (r[iEX]||'').toString().toLowerCase();
-        var rn = (r[iNom]||'').toString().trim();
-        if(rx.includes('entr') && rn==='Entry'){entryRows.push(r);idx++;}
+        var rx = (r[6]||'').toString().toLowerCase();
+        var rn = (r[9]||'').toString().trim();
+        if((rx.includes('entr')) && rn === 'Entry'){ entryRows.push(r); idx++; }
         else break;
       }
-      // Collect all exit rows until next Entry
+      // Collect exit rows until next Entry
       var exitRows = [];
       while(idx < dataRows.length){
         var r = dataRows[idx];
-        var rx = (r[iEX]||'').toString().toLowerCase();
-        var rn = (r[iNom]||'').toString().trim();
-        if(!rx.includes('entr') || rn!=='Entry'){exitRows.push(r);idx++;}
+        var rx = (r[6]||'').toString().toLowerCase();
+        var rn = (r[9]||'').toString().trim();
+        if(!rx.includes('entr') || rn !== 'Entry'){ exitRows.push(r); idx++; }
         else break;
       }
 
-      // Calculate trade
-      var instr = (entryRows[0][iInstr]||'MGC').toString().replace(/ \d{2}-\d{2}/,'').trim();
-      var action = (entryRows[0][iAction]||'').toString().toLowerCase();
-      var side = action.includes('acheter')||action.includes('buy')?'BUY':'SELL';
-      var sumEp = entryRows.reduce(function(s,r){
-        var p = r[iPrix];
-        if(typeof p==='number') return s+p;
-        return s+(parseFloat((p||'0').toString().replace(',','.'))||0);
-      },0);
-      var avgEp = sumEp/entryRows.length;
-      var totalQty = entryRows.reduce(function(s,r){return s+(parseInt(r[iQty])||0);},0);
-      var mul = instr.includes('MGC')?10:instr.includes('MNQ')?2:1;
+      // Parse price - Excel gives string like "4518,6" or number
+      function parsePrice(val){
+        if(typeof val === 'number') return val;
+        return parseFloat((val||'0').toString().replace(',','.')) || 0;
+      }
 
-      var totalPnl=0, lastXp=0;
+      // Parse date - Excel gives datetime object serialized as string by SheetJS
+      function parseDate(val){
+        if(!val) return {date:'', time:''};
+        var s = val.toString();
+        // SheetJS formats: "2026-08-28T18:22:37.320Z" or "28/08/2026 18:22:37"
+        if(s.includes('T') || s.includes('-')){
+          try{
+            var d = new Date(s);
+            if(!isNaN(d.getTime())){
+              var dd = d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);
+              var tt = ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);
+              return {date:dd, time:tt};
+            }
+          }catch(e){}
+        }
+        // String format DD/MM/YYYY HH:MM:SS
+        var parts = s.split(' ');
+        var dateStr = '';
+        if(parts[0]){
+          var dp = parts[0].split('/');
+          if(dp.length===3) dateStr = dp[2]+'-'+dp[1].padStart(2,'0')+'-'+dp[0].padStart(2,'0');
+          else dateStr = parts[0];
+        }
+        return {date: dateStr, time: parts[1]||''};
+      }
+
+      var instr = (entryRows[0][0]||'MGC').toString().replace(/ \d{2}-\d{2}/,'').trim();
+      var action = (entryRows[0][1]||'').toString().toLowerCase();
+      var side = action.includes('acheter')||action.includes('buy') ? 'BUY' : 'SELL';
+      var sumEp = entryRows.reduce(function(s,r){ return s + parsePrice(r[3]); }, 0);
+      var avgEp = sumEp / entryRows.length;
+      var totalQty = entryRows.reduce(function(s,r){ return s + (parseInt(r[2])||0); }, 0);
+      var mul = instr.includes('MGC') ? 10 : instr.includes('MNQ') ? 2 : 1;
+
+      var totalPnl = 0, lastXp = 0;
       exitRows.forEach(function(ex){
-        var xp = ex[iPrix];
-        if(typeof xp==='number'){} else xp=parseFloat((xp||'0').toString().replace(',','.'))||0;
-        var xqty = parseInt(ex[iQty])||1;
-        totalPnl += side==='BUY'?(xp-avgEp)*xqty*mul:(avgEp-xp)*xqty*mul;
+        var xp = parsePrice(ex[3]);
+        var xqty = parseInt(ex[2])||1;
+        totalPnl += side==='BUY' ? (xp-avgEp)*xqty*mul : (avgEp-xp)*xqty*mul;
         lastXp = xp;
       });
       totalPnl = Math.round(totalPnl*100)/100;
 
-      // Parse date from heure
-      var heureRaw = entryRows[0][iHeure];
-      var dateStr='', timeStr='';
-      if(heureRaw){
-        var heureStr = heureRaw.toString();
-        // Excel might give us a date number or string
-        if(typeof heureRaw==='number'){
-          // Excel date serial number
-          var jsDate = new Date(Math.round((heureRaw-25569)*86400*1000));
-          dateStr = jsDate.getFullYear()+'-'+('0'+(jsDate.getMonth()+1)).slice(-2)+'-'+('0'+jsDate.getDate()).slice(-2);
-          timeStr = ('0'+jsDate.getHours()).slice(-2)+':'+('0'+jsDate.getMinutes()).slice(-2);
-        } else {
-          var parts = heureStr.split(' ');
-          if(parts[0]){
-            var dp=parts[0].split('/');
-            if(dp.length===3) dateStr=dp[2]+'-'+dp[1].padStart(2,'0')+'-'+dp[0].padStart(2,'0');
-            else dateStr=parts[0];
-          }
-          timeStr=parts[1]||'';
-        }
-      }
-
-      var hr=timeStr?parseInt(timeStr.split(':')[0]):12;
-      var session=hr>=8&&hr<10?'Europe':hr>=15&&hr<18?'US':'Autre';
-      var symbol=instr.includes('MNQ')?'NAS100':'GOLD';
+      var dt = parseDate(entryRows[0][4]);
+      var hr = dt.time ? parseInt(dt.time.split(':')[0]) : 12;
+      var session = hr>=8&&hr<10 ? 'Europe' : (hr>=15&&hr<18 ? 'US' : 'Autre');
+      var symbol = instr.includes('MNQ') ? 'NAS100' : 'GOLD';
 
       trades.push({
-        date:dateStr,symbol:symbol,side:side,
-        lots:totalQty/100,entry:Math.round(avgEp*100)/100,
-        exit:lastXp||null,pnl:totalPnl,netPnl:totalPnl,
-        status:exitRows.length>0?'closed':'open',
-        session:session,emotion:'Neutre',error:''
+        date: dt.date, symbol: symbol, side: side,
+        lots: totalQty/100, entry: Math.round(avgEp*100)/100,
+        exit: lastXp||null, pnl: totalPnl, netPnl: totalPnl,
+        status: exitRows.length>0 ? 'closed' : 'open',
+        session: session, emotion: 'Neutre', error: ''
       });
     } else { idx++; }
   }
 
-  if(!trades.length){showErr('Aucun trade Entry trouvé dans le fichier Excel.');return;}
-  
+  if(!trades.length){ showErr('Aucun trade Entry trouvé dans le fichier Excel.'); return; }
+  console.log('Trades parsed:', trades.length, 'Total PnL:', trades.reduce(function(s,t){return s+t.pnl;},0));
+
   // Bulk insert
   fetch(API+'/bulk',{
     method:'POST',
