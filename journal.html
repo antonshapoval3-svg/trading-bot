@@ -519,28 +519,28 @@ function parseCSV(file){
     var text=e.target.result;
     var lines=text.split('\n').map(function(l){return l.trim();}).filter(function(l){return l;});
     if(lines.length<2){showErr('Fichier CSV vide.');return;}
-    var isNT=lines[0].includes(';')&&lines[0].includes('Instrument');
+    var isNT=lines[0].includes(';')&&(lines[0].includes('Instrument')||lines[0].includes('nstrument')||lines[0].includes('Action'));
     if(isNT){
-      var headers=lines[0].split(';').map(function(h){return h.replace(/\uFEFF/g,'').trim().toLowerCase();});
+      var headers=lines[0].split(';').map(function(h){return h.replace(/[\uFEFF\u200B]/g,'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');});
       var rows=[];
       for(var i=1;i<lines.length;i++){var cols=lines[i].split(';').map(function(x){return x.trim();});if(cols.length<5)continue;var row={};headers.forEach(function(h,j){row[h]=cols[j]||'';});rows.push(row);}
-      var executed=rows.filter(function(r){var st=(r['etat']||r['état']||'').toLowerCase();return st.includes('cut')||st==='éxécuté'||st==='executé';});
-      var entryRows=executed.filter(function(r){return (r['nom']||'').toLowerCase()==='entry';});
+      var executed=rows.filter(function(r){var st=(r['etat']||r['état']||r['state']||'').toLowerCase();return st.includes('cut');});
+      var entryRows=executed.filter(function(r){var nom=(r['nom']||r['name']||'').toLowerCase().trim();return nom==='entry';});
       var trades=[];
       entryRows.forEach(function(entry){
-        var entryTime=entry['heure']||'';
-        var instrument=(entry['instrument']||'MGC').replace(/ \d{2}-\d{2}/,'').trim();
-        var action=(entry['action']||'').toLowerCase();
+        var entryTime=entry['heure']||entry['time']||entry['date']||''||'';
+        var instrument=(entry['instrument']||entry['symbol']||'MGC').replace(/ \d{2}-\d{2}/,'').trim();
+        var action=(entry['action']||entry['type']||'').toLowerCase();
         var qty=parseInt(entry['éxécuté']||entry['execute']||1)||1;
-        var ep=parseFloat((entry['prix moyen']||'0').replace(',','.'))||0;
-        var acct=entry['compte']||'';
+        var ep=parseFloat((entry['prix moyen']||entry['prix']||entry['price']||'0'||'0').replace(',','.'))||0;
+        var acct=entry['compte']||entry['account']||'';
         var side=action.includes('acheter')||action.includes('buy')?'BUY':'SELL';
         var dateStr='',timeStr='';
         if(entryTime){var pts=entryTime.split(' ');if(pts[0]){var dp=pts[0].split('/');if(dp.length===3)dateStr=dp[2]+'-'+dp[1].padStart(2,'0')+'-'+dp[0].padStart(2,'0');else dateStr=pts[0];}timeStr=pts[1]||'';}
-        var exitRows=executed.filter(function(r2){var n2=(r2['nom']||'').toLowerCase();var isEx=n2.includes('stop')||n2.includes('target')||n2.includes('fermer')||n2.includes('externe');var si=(r2['instrument']||'').replace(/ \d{2}-\d{2}/,'').trim()===instrument;return isEx&&si&&r2['compte']===acct&&(r2['heure']||'')>=entryTime;});
+        var exitRows=executed.filter(function(r2){var n2=(r2['nom']||'').toLowerCase();var isEx=n2.includes('stop')||n2.includes('target')||n2.includes('fermer')||n2.includes('externe');var si=(r2['instrument']||r2['symbol']||'').replace(/ \d{2}-\d{2}/,'').trim()===instrument;return isEx&&si&&(r2['compte']||r2['account']||'')===acct&&(r2['heure']||'')>=entryTime;});
         var exit=exitRows.sort(function(a,b){return (a['heure']||'')>(b['heure']||'')?1:-1;})[0];
         var xp=0,netPnl=0;
-        if(exit){xp=parseFloat((exit['prix moyen']||'0').replace(',','.'))||0;var mul=instrument.includes('MGC')?10:instrument.includes('MNQ')?2:1;netPnl=side==='BUY'?(xp-ep)*qty*mul:(ep-xp)*qty*mul;netPnl=Math.round(netPnl*100)/100;}
+        if(exit){xp=parseFloat((exit['prix moyen']||exit['prix']||exit['price']||'0').replace(',','.'))||0;var mul=instrument.includes('MGC')?10:instrument.includes('MNQ')?2:1;netPnl=side==='BUY'?(xp-ep)*qty*mul:(ep-xp)*qty*mul;netPnl=Math.round(netPnl*100)/100;}
         var hr=timeStr?parseInt(timeStr.split(':')[0]):12;
         var session=hr>=8&&hr<10?'Europe':hr>=15&&hr<18?'US':'Autre';
         var symbol=instrument.includes('MNQ')?'NAS100':'GOLD';
