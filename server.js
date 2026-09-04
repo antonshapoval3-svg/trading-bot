@@ -114,7 +114,7 @@ app.post("/api/trades/bulk", auth, async (req, res) => {
   try {
     const trades = req.body;
     if (!Array.isArray(trades)) return res.status(400).json({ error: "Array required" });
-    const docs = trades.map(t => ({ ...t, userId: req.user.id, createdAt: new Date() }));
+    const docs = trades.map(t => ({ ...t, userId: req.userId, createdAt: new Date() }));
     const result = await db.collection("trades").insertMany(docs);
     res.json({ inserted: result.insertedCount });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -141,7 +141,7 @@ app.put("/api/trades/:id", auth, async (req, res) => {
 // BULK DELETE all trades for user
 app.delete("/api/trades", auth, async (req, res) => {
   try {
-    const result = await db.collection("trades").deleteMany({ userId: req.user.id });
+    const result = await db.collection("trades").deleteMany({ userId: req.userId });
     res.json({ deleted: result.deletedCount });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
