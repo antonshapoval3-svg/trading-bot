@@ -211,4 +211,4 @@ app.listen(PORT, async () => {
   console.log("Serveur port " + PORT);
   await connectMongo();
   scheduleBriefing();
-});
+}); 
