@@ -611,8 +611,19 @@ function parseCSV(file){
       if(!trades.length){showErr('Aucun trade trouvé.');return;}
       var added=0;
       var doNext=function(i){
-        if(i>=trades.length){showSuccess(added+' trades NinjaTrader importés !');loadTrades();return;}
-        apiPost(trades[i]).then(function(){added++;doNext(i+1);}).catch(function(){doNext(i+1);});
+        if(i>=trades.length){
+          showSuccess(added+' / '+trades.length+' trades NinjaTrader importés !');
+          loadTrades();return;
+        }
+        setTimeout(function(){
+          apiPost(trades[i]).then(function(res){
+            if(res&&(res._id||res.id)){added++;}
+            doNext(i+1);
+          }).catch(function(e){
+            console.error('Import error trade',i,e);
+            doNext(i+1);
+          });
+        },50);
       };
       doNext(0);
     } else {
