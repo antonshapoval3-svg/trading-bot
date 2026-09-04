@@ -521,85 +521,63 @@ function parseCSV(file){
     if(lines.length<2){showErr('Fichier CSV vide.');return;}
     var isNT=lines[0].includes(';')&&(lines[0].includes('Instrument')||lines[0].includes('nstrument')||lines[0].includes('Action'));
     if(isNT){
-      // Detect format: Ordres (col10=Nom) vs Historique trades (col6=E/X)
-      var firstCols=lines.length>1?lines[1].split(';'):[];
-      var isTradeHistory=lines[0].includes('E / X')||lines[0].includes('E/X')||(firstCols[6]==='E'||firstCols[6]==='X');
-
-      if(isTradeHistory){
-        // Historique des trades format:
-        // 0=Instrument, 1=Action, 2=Qté, 3=Prix, 4=Heure, 5=ID, 6=E/X, 7=Position, 8=ID ordre, 9=Nom, 10=Commission, 11=Taux, 12=Compte
-        var entries=[],exits=[];
-        for(var i=1;i<lines.length;i++){
-          var cols=lines[i].split(';').map(function(x){return x.trim();});
-          if(cols.length<7)continue;
-          var ex=cols[6].trim().toUpperCase();
-          if(ex==='E')entries.push(cols);
-          else if(ex==='X')exits.push(cols);
-        }
-        var trades=[];
-        var n=Math.min(entries.length,exits.length);
-        for(var i=0;i<n;i++){
-          var en=entries[i],ex=exits[i];
-          var ep=parseFloat((en[3]||'0').replace(',','.'))||0;
-          var xp=parseFloat((ex[3]||'0').replace(',','.'))||0;
-          var qty=parseInt(en[2])||1;
-          var action=(en[1]||'').toLowerCase();
-          var side=action.includes('acheter')||action.includes('buy')?'BUY':'SELL';
-          var instrument=(en[0]||'MGC').replace(/ \d{2}-\d{2}/,'').trim();
-          var mul=instrument.includes('MGC')?10:instrument.includes('MNQ')?2:1;
-          var netPnl=side==='BUY'?(xp-ep)*qty*mul:(ep-xp)*qty*mul;
-          netPnl=Math.round(netPnl*100)/100;
-          var dateStr='';
-          var entryTime=en[4]||'';
-          if(entryTime){var pts=entryTime.split(' ');if(pts[0]){var dp=pts[0].split('/');if(dp.length===3)dateStr=dp[2]+'-'+dp[1].padStart(2,'0')+'-'+dp[0].padStart(2,'0');}}
-          var timeStr=entryTime.split(' ')[1]||'';
-          var hr=timeStr?parseInt(timeStr.split(':')[0]):12;
-          var session=hr>=8&&hr<10?'Europe':hr>=15&&hr<18?'US':'Autre';
-          var symbol=instrument.includes('MNQ')?'NAS100':'GOLD';
-          trades.push({date:dateStr,symbol:symbol,side:side,lots:qty/100,entry:ep,exit:xp,pnl:netPnl,netPnl:netPnl,status:'closed',session:session,emotion:'Neutre',error:''});
-        }
-        if(!trades.length){showErr('Aucun trade trouvé dans l historique.');return;}
-        var added=0;
-        var doNext=function(i){if(i>=trades.length){showSuccess(added+' trades importés depuis NinjaTrader !');loadTrades();return;}apiPost(trades[i]).then(function(){added++;doNext(i+1);}).catch(function(){doNext(i+1);});};
-        doNext(0);
-
-      } else {
-        // Ordres format - position based
-        var IDX_I=0,IDX_A=1,IDX_E=6,IDX_Q=7,IDX_P=8,IDX_N=10,IDX_C=13,IDX_H=17;
-        var rows=[];
-        for(var i=1;i<lines.length;i++){
-          var cols=lines[i].split(';').map(function(x){return x.trim();});
-          if(cols.length<11)continue;
-          rows.push(cols);
-        }
-        var executed=rows.filter(function(r){return (r[IDX_E]||'').toLowerCase().includes('cut');});
-        var entryRows=executed.filter(function(r){return (r[IDX_N]||'').toLowerCase().trim()==='entry';});
-        if(!entryRows.length){showErr('Aucun trade Entry trouvé. Utilisez Historique des trades dans NinjaTrader.');return;}
-        var trades=[];
-        entryRows.forEach(function(entry){
-          var entryTime=entry[IDX_H]||'';
-          var instrument=(entry[IDX_I]||'MGC').replace(/ \d{2}-\d{2}/,'').trim();
-          var action=(entry[IDX_A]||'').toLowerCase();
-          var qty=parseInt(entry[IDX_Q])||1;
-          var ep=parseFloat((entry[IDX_P]||'0').replace(',','.'))||0;
-          var acct=entry[IDX_C]||'';
-          var side=action.includes('acheter')||action.includes('buy')?'BUY':'SELL';
-          var dateStr='',timeStr='';
-          if(entryTime){var pts=entryTime.split(' ');if(pts[0]){var dp=pts[0].split('/');if(dp.length===3)dateStr=dp[2]+'-'+dp[1].padStart(2,'0')+'-'+dp[0].padStart(2,'0');else dateStr=pts[0];}timeStr=pts[1]||'';}
-          var exitRows=executed.filter(function(r2){var n2=(r2[IDX_N]||'').toLowerCase();var isEx=n2.includes('stop')||n2.includes('target')||n2.includes('fermer')||n2.includes('externe');var si=(r2[IDX_I]||'').replace(/ \d{2}-\d{2}/,'').trim()===instrument;return isEx&&si&&r2[IDX_C]===acct&&r2[IDX_H]>=entryTime;});
-          var exit=exitRows.sort(function(a,b){return a[IDX_H]>b[IDX_H]?1:-1;})[0];
-          var xp=0,netPnl=0;
-          if(exit){xp=parseFloat((exit[IDX_P]||'0').replace(',','.'))||0;var mul=instrument.includes('MGC')?10:instrument.includes('MNQ')?2:1;netPnl=side==='BUY'?(xp-ep)*qty*mul:(ep-xp)*qty*mul;netPnl=Math.round(netPnl*100)/100;}
-          var hr=timeStr?parseInt(timeStr.split(':')[0]):12;
-          var session=hr>=8&&hr<10?'Europe':hr>=15&&hr<18?'US':'Autre';
-          var symbol=instrument.includes('MNQ')?'NAS100':'GOLD';
-          trades.push({date:dateStr,symbol:symbol,side:side,lots:qty/100,entry:ep,exit:xp||null,pnl:netPnl,netPnl:netPnl,status:exit?'closed':'open',session:session,emotion:'Neutre',error:''});
-        });
-        if(!trades.length){showErr('Aucun trade complet trouvé.');return;}
-        var added=0;
-        var doNext=function(i){if(i>=trades.length){showSuccess(added+' trades importés !');loadTrades();return;}apiPost(trades[i]).then(function(){added++;doNext(i+1);}).catch(function(){doNext(i+1);});};
-        doNext(0);
+      // NinjaTrader Historique des trades format:
+      // 0=Instrument, 1=Action, 2=Qté, 3=Prix, 4=Heure, 5=ID, 6=Entrée/Sortie, 7=Position, 8=ID ordre, 9=Entry/Exit, 10=Commission, 11=Taux, 12=Compte
+      var rows=[];
+      for(var i=1;i<lines.length;i++){
+        var cols=lines[i].split(';').map(function(x){return x.trim().replace(/\r/g,'');});
+        if(cols.length<7)continue;
+        rows.push(cols);
       }
+      // Entry = col 9 contains 'entry' OR col 6 contains 'entr'
+      var entries=rows.filter(function(r){
+        var c6=(r[6]||'').toLowerCase();
+        var c9=(r[9]||'').toLowerCase();
+        return c9==='entry'||c6.includes('entr');
+      });
+      // Exit = col 9 contains 'exit' OR col 6 contains 'sort'
+      var exits=rows.filter(function(r){
+        var c6=(r[6]||'').toLowerCase();
+        var c9=(r[9]||'').toLowerCase();
+        return c9==='exit'||c6.includes('sort');
+      });
+      if(!entries.length){showErr('Aucun trade Entry trouvé. Vérifiez le fichier Historique des trades NinjaTrader.');return;}
+      var trades=[];
+      var usedExits=[];
+      entries.forEach(function(en){
+        var instrument=(en[0]||'MGC').replace(/ \d{2}-\d{2}/,'').trim();
+        var acct=en[12]||'';
+        var entryTime=en[4]||'';
+        // Find matching exit: same instrument, same account, after entry time
+        var exit=null;
+        for(var j=0;j<exits.length;j++){
+          if(usedExits.indexOf(j)>-1)continue;
+          var ex=exits[j];
+          var si=(ex[0]||'').replace(/ \d{2}-\d{2}/,'').trim()===instrument;
+          var sa=(ex[12]||'')===acct;
+          var after=(ex[4]||'')>=entryTime;
+          if(si&&sa&&after){exit=ex;usedExits.push(j);break;}
+        }
+        var ep=parseFloat((en[3]||'0').replace(',','.'))||0;
+        var xp=exit?parseFloat((exit[3]||'0').replace(',','.'))||0:0;
+        var qty=parseInt(en[2])||1;
+        var action=(en[1]||'').toLowerCase();
+        var side=action.includes('acheter')||action.includes('buy')?'BUY':'SELL';
+        var mul=instrument.includes('MGC')?10:instrument.includes('MNQ')?2:1;
+        var netPnl=exit?(side==='BUY'?(xp-ep)*qty*mul:(ep-xp)*qty*mul):0;
+        netPnl=Math.round(netPnl*100)/100;
+        var dateStr='';
+        if(entryTime){var pts=entryTime.split(' ');if(pts[0]){var dp=pts[0].split('/');if(dp.length===3)dateStr=dp[2]+'-'+dp[1].padStart(2,'0')+'-'+dp[0].padStart(2,'0');}}
+        var timeStr=(entryTime.split(' ')[1]||'');
+        var hr=timeStr?parseInt(timeStr.split(':')[0]):12;
+        var session=hr>=8&&hr<10?'Europe':hr>=15&&hr<18?'US':'Autre';
+        var symbol=instrument.includes('MNQ')?'NAS100':'GOLD';
+        trades.push({date:dateStr,symbol:symbol,side:side,lots:qty/100,entry:ep,exit:xp||null,pnl:netPnl,netPnl:netPnl,status:exit?'closed':'open',session:session,emotion:'Neutre',error:''});
+      });
+      if(!trades.length){showErr('Aucun trade complet trouvé.');return;}
+      var added=0;
+      var doNext=function(i){if(i>=trades.length){showSuccess(added+' trades NinjaTrader importés !');loadTrades();return;}apiPost(trades[i]).then(function(){added++;doNext(i+1);}).catch(function(){doNext(i+1);});};
+      doNext(0);
     } else {
       var headers=lines[0].split(',').map(function(h){return h.replace(/"/g,'').trim().toLowerCase();});
       var parsed=[];
