@@ -594,10 +594,7 @@ function parseCSV(file){
 
       if(!trades.length){showErr('Aucun trade trouvé dans le rapport.');return;}
 
-      fetch(API+'/bulk',{method:'POST',headers:authHeaders(),body:JSON.stringify(trades)})
-      .then(function(r){return r.json();})
-      .then(function(res){showSuccess((res.inserted||trades.length)+' trades importés !');loadTrades();})
-      .catch(function(e){showErr('Erreur: '+e.message);});
+      bulkInsert(trades, function(n){ showSuccess(n+' trades importés !'); loadTrades(); });
 
     } else {
       // Other CSV formats (TradingView etc)
@@ -1094,13 +1091,7 @@ function parseNTExcel(rows){
   if(!trades.length){showErr('Aucun trade trouvé dans le fichier Excel.');return;}
   console.log('Trades:',trades.length,'Total PnL:',trades.reduce(function(s,t){return s+t.pnl;},0).toFixed(2));
 
-  fetch(API+'/bulk',{method:'POST',headers:authHeaders(),body:JSON.stringify(trades)})
-  .then(function(r){return r.json();})
-  .then(function(res){var n=res.inserted||trades.length;
-    var ok=document.getElementById('import-ok');var okm=document.getElementById('import-ok-msg');
-    if(ok)ok.style.display='flex';if(okm)okm.textContent=n+' trades importés depuis Excel !';
-    loadTrades();})
-  .catch(function(e){showErr('Erreur: '+e.message);});
+  bulkInsert(trades, function(n){ showSuccess(n+' trades importés !'); loadTrades(); });
 }
 
 
@@ -1111,6 +1102,53 @@ function showSuccess(msg){
   if(err)err.style.display='none';
   if(ok)ok.style.display='flex';
   if(okm)okm.textContent=msg;
+}
+
+function bulkInsert(trades, onSuccess){
+  // Split into chunks of 10 to avoid timeout
+  var CHUNK = 10;
+  var chunks = [];
+  for(var i=0;i<trades.length;i+=CHUNK){
+    chunks.push(trades.slice(i,i+CHUNK));
+  }
+  var totalInserted = 0;
+  var chunkIdx = 0;
+
+  function sendChunk(){
+    if(chunkIdx >= chunks.length){
+      onSuccess(totalInserted);
+      return;
+    }
+    var chunk = chunks[chunkIdx];
+    fetch(API+'/bulk',{
+      method:'POST',
+      headers:authHeaders(),
+      body:JSON.stringify(chunk)
+    }).then(function(r){
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      return r.json();
+    }).then(function(res){
+      totalInserted += (res.inserted||chunk.length);
+      chunkIdx++;
+      setTimeout(sendChunk, 100);
+    }).catch(function(e){
+      // Retry once
+      console.error('Chunk',chunkIdx,'failed:',e.message,'- retrying...');
+      setTimeout(function(){
+        fetch(API+'/bulk',{method:'POST',headers:authHeaders(),body:JSON.stringify(chunk)})
+        .then(function(r){return r.json();})
+        .then(function(res){
+          totalInserted += (res.inserted||chunk.length);
+          chunkIdx++;
+          sendChunk();
+        }).catch(function(){
+          chunkIdx++;
+          sendChunk();
+        });
+      }, 500);
+    });
+  }
+  sendChunk();
 }
 </script>
 
