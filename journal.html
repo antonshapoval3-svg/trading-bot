@@ -1096,10 +1096,22 @@ function parseNTExcel(rows){
 
   fetch(API+'/bulk',{method:'POST',headers:authHeaders(),body:JSON.stringify(trades)})
   .then(function(r){return r.json();})
-  .then(function(res){showSuccess((res.inserted||trades.length)+' trades importés depuis Excel !');loadTrades();})
+  .then(function(res){var n=res.inserted||trades.length;
+    var ok=document.getElementById('import-ok');var okm=document.getElementById('import-ok-msg');
+    if(ok)ok.style.display='flex';if(okm)okm.textContent=n+' trades importés depuis Excel !';
+    loadTrades();})
   .catch(function(e){showErr('Erreur: '+e.message);});
 }
 
+
+function showSuccess(msg){
+  var ok=document.getElementById('import-ok');
+  var okm=document.getElementById('import-ok-msg');
+  var err=document.getElementById('import-err');
+  if(err)err.style.display='none';
+  if(ok)ok.style.display='flex';
+  if(okm)okm.textContent=msg;
+}
 </script>
 
 <div id="login-overlay" style="display:none;position:fixed;inset:0;background:#060606;z-index:9999;align-items:center;justify-content:center">
