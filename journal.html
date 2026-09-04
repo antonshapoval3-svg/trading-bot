@@ -521,32 +521,58 @@ function parseCSV(file){
     if(lines.length<2){showErr('Fichier CSV vide.');return;}
     var isNT=lines[0].includes(';')&&(lines[0].includes('Instrument')||lines[0].includes('nstrument')||lines[0].includes('Action'));
     if(isNT){
-      var headers=lines[0].split(';').map(function(h){return h.replace(/[\uFEFF\u200B]/g,'').trim().toLowerCase();});
+      // Position-based: 0=Instrument,1=Action,6=État,7=Exécuté,8=PrixMoyen,10=Nom,13=Compte,17=Heure
+      var IDX_I=0,IDX_A=1,IDX_E=6,IDX_Q=7,IDX_P=8,IDX_N=10,IDX_C=13,IDX_H=17;
       var rows=[];
-      for(var i=1;i<lines.length;i++){var cols=lines[i].split(';').map(function(x){return x.trim();});if(cols.length<5)continue;var row={};headers.forEach(function(h,j){row[h]=cols[j]||'';});rows.push(row);}
-      var executed=rows.filter(function(r){var keys=Object.keys(r);var etatKey=keys.find(function(k){return k.includes('tat')||k==='etat';});var st=etatKey?(r[etatKey]||'').toLowerCase():'';return st.includes('cut')||st.includes('xecut');});
-      var entryRows=executed.filter(function(r){var nomKey=Object.keys(r).find(function(k){return k==='nom'||k==='name';});var nom=nomKey?(r[nomKey]||'').toLowerCase().trim():'';return nom==='entry';});
+      for(var i=1;i<lines.length;i++){
+        var cols=lines[i].split(';').map(function(x){return x.trim();});
+        if(cols.length<11)continue;
+        rows.push(cols);
+      }
+      // Executed = col 6 contains 'cut' (ExĂ©cutĂ© or Exécuté)
+      var executed=rows.filter(function(r){
+        return (r[IDX_E]||'').toLowerCase().includes('cut');
+      });
+      // Entry = col 10 = 'Entry'
+      var entryRows=executed.filter(function(r){
+        return (r[IDX_N]||'').toLowerCase().trim()==='entry';
+      });
+      if(!entryRows.length){showErr('Aucun trade Entry trouvé. Vérifiez que votre fichier NinjaTrader contient des ordres Exécutés.');return;}
       var trades=[];
       entryRows.forEach(function(entry){
-        var entryTime=entry['heure']||entry['time']||''||'';
-        var instrument=(entry['instrument']||entry['symbol']||'MGC').replace(/ \d{2}-\d{2}/,'').trim();
-        var action=(entry['action']||entry['type']||'').toLowerCase();
-        var qty=parseInt(entry['éxécuté']||entry['execute']||1)||1;
-        var ep=parseFloat((entry['prix moyen']||entry['prix']||entry['price']||'0'||'0').replace(',','.'))||0;
-        var acct=entry['compte']||entry['account']||'';
+        var entryTime=entry[IDX_H]||'';
+        var instrument=(entry[IDX_I]||'MGC').replace(/ \d{2}-\d{2}/,'').trim();
+        var action=(entry[IDX_A]||'').toLowerCase();
+        var qty=parseInt(entry[IDX_Q])||1;
+        var ep=parseFloat((entry[IDX_P]||'0').replace(',','.'))||0;
+        var acct=entry[IDX_C]||'';
         var side=action.includes('acheter')||action.includes('buy')?'BUY':'SELL';
         var dateStr='',timeStr='';
-        if(entryTime){var pts=entryTime.split(' ');if(pts[0]){var dp=pts[0].split('/');if(dp.length===3)dateStr=dp[2]+'-'+dp[1].padStart(2,'0')+'-'+dp[0].padStart(2,'0');else dateStr=pts[0];}timeStr=pts[1]||'';}
-        var exitRows=executed.filter(function(r2){var n2=(r2['nom']||'').toLowerCase();var isEx=n2.includes('stop')||n2.includes('target')||n2.includes('fermer')||n2.includes('externe');var si=(r2['instrument']||r2['symbol']||'').replace(/ \d{2}-\d{2}/,'').trim()===instrument;return isEx&&si&&(r2['compte']||r2['account']||'')===acct&&(r2['heure']||'')>=entryTime;});
-        var exit=exitRows.sort(function(a,b){return (a['heure']||'')>(b['heure']||'')?1:-1;})[0];
+        if(entryTime){
+          var pts=entryTime.split(' ');
+          if(pts[0]){var dp=pts[0].split('/');if(dp.length===3)dateStr=dp[2]+'-'+dp[1].padStart(2,'0')+'-'+dp[0].padStart(2,'0');else dateStr=pts[0];}
+          timeStr=pts[1]||'';
+        }
+        var exitRows=executed.filter(function(r2){
+          var n2=(r2[IDX_N]||'').toLowerCase();
+          var isEx=n2.includes('stop')||n2.includes('target')||n2.includes('fermer')||n2.includes('externe')||n2.includes('close');
+          var si=(r2[IDX_I]||'').replace(/ \d{2}-\d{2}/,'').trim()===instrument;
+          return isEx&&si&&r2[IDX_C]===acct&&r2[IDX_H]>=entryTime;
+        });
+        var exit=exitRows.sort(function(a,b){return a[IDX_H]>b[IDX_H]?1:-1;})[0];
         var xp=0,netPnl=0;
-        if(exit){xp=parseFloat((exit['prix moyen']||exit['prix']||exit['price']||'0').replace(',','.'))||0;var mul=instrument.includes('MGC')?10:instrument.includes('MNQ')?2:1;netPnl=side==='BUY'?(xp-ep)*qty*mul:(ep-xp)*qty*mul;netPnl=Math.round(netPnl*100)/100;}
+        if(exit){
+          xp=parseFloat((exit[IDX_P]||'0').replace(',','.'))||0;
+          var mul=instrument.includes('MGC')?10:instrument.includes('MNQ')?2:1;
+          netPnl=side==='BUY'?(xp-ep)*qty*mul:(ep-xp)*qty*mul;
+          netPnl=Math.round(netPnl*100)/100;
+        }
         var hr=timeStr?parseInt(timeStr.split(':')[0]):12;
         var session=hr>=8&&hr<10?'Europe':hr>=15&&hr<18?'US':'Autre';
         var symbol=instrument.includes('MNQ')?'NAS100':'GOLD';
         trades.push({date:dateStr,symbol:symbol,side:side,lots:qty/100,entry:ep,exit:xp||null,pnl:netPnl,netPnl:netPnl,status:exit?'closed':'open',session:session,emotion:'Neutre',error:''});
       });
-      if(!trades.length){showErr('Aucun trade Entry trouvé.');return;}
+      if(!trades.length){showErr('Aucun trade complet trouvé.');return;}
       var added=0;
       var doNext=function(i){if(i>=trades.length){showSuccess(added+' trades NinjaTrader importés !');loadTrades();return;}apiPost(trades[i]).then(function(){added++;doNext(i+1);}).catch(function(){doNext(i+1);});};
       doNext(0);
