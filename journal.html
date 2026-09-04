@@ -168,6 +168,7 @@ tr:hover td{background:var(--bg3)}
   .topbar{padding:10px 14px}
 }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 <!-- SIDEBAR -->
@@ -279,11 +280,11 @@ tr:hover td{background:var(--bg3)}
           <p>Glisse ton fichier CSV ici</p>
           <small>ou clique pour parcourir — TradingView / NinjaTrader</small>
         </div>
-        <input type="file" id="csv-file" accept=".csv" style="display:none" onchange="handleFile(event)">
+        <input type="file" id="csv-file" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleFile(event)">
         <div style="margin-top:12px;padding-top:12px;border-top:0.5px solid var(--border)">
           <div style="font-size:12px;color:var(--text3);margin-bottom:8px">🎯 NinjaTrader — Import propre (efface tout avant)</div>
-          <button onclick="document.getElementById('nt-file').click()" style="width:100%;padding:11px;background:var(--red);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;opacity:.85">🗑️ Vider tous les trades + Importer NinjaTrader</button>
-          <input type="file" id="nt-file" accept=".csv" style="display:none" onchange="clearAndImport(this.files[0])">
+          <button onclick="document.getElementById('nt-file').click()" style="width:100%;padding:11px;background:var(--red);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;opacity:.85">🗑️ Vider + Importer NinjaTrader (Excel ou CSV)</button>
+          <input type="file" id="nt-file" accept=".csv,.xlsx,.xls" style="display:none" onchange="clearAndImport(this.files[0])">
         </div>
         <div class="alert-box success" id="import-ok"><i class="ti ti-check"></i> <span id="import-ok-msg"></span></div>
         <div class="alert-box error" id="import-err"><i class="ti ti-alert-circle"></i> <span id="import-err-msg"></span></div>
@@ -514,7 +515,15 @@ function showPageM(p,btn){
 function onDragOver(e){e.preventDefault();document.getElementById('drop-zone').classList.add('drag');}
 function onDragLeave(){document.getElementById('drop-zone').classList.remove('drag');}
 function onDrop(e){e.preventDefault();onDragLeave();var f=e.dataTransfer.files[0];if(f)parseCSV(f);}
-function handleFile(e){var f=e.target.files[0];if(f)parseCSV(f);}
+function handleFile(e){
+  var f=e.target.files[0];
+  if(!f)return;
+  if(f.name.endsWith('.xlsx')||f.name.endsWith('.xls')){
+    parseExcelFile(f, parseNTExcel);
+  } else {
+    parseCSV(f);
+  }
+}
 
 
 function parseCSV(file){
@@ -1019,11 +1028,180 @@ function showAlert(type,msg){var el=document.getElementById('alert-box');if(el){
 function clearAndImport(file){
   if(!file)return;
   if(!confirm('Effacer TOUS les trades et importer ce fichier NinjaTrader ?'))return;
-  // Use bulk delete then bulk import
   fetch(API,{method:'DELETE',headers:authHeaders()})
-  .then(function(){parseCSV(file);})
-  .catch(function(){parseCSV(file);});
+  .then(function(){
+    if(file.name.endsWith('.xlsx')||file.name.endsWith('.xls')){
+      parseExcelFile(file, parseNTExcel);
+    } else {
+      parseCSV(file);
+    }
+  })
+  .catch(function(){
+    if(file.name.endsWith('.xlsx')||file.name.endsWith('.xls')){
+      parseExcelFile(file, parseNTExcel);
+    } else {
+      parseCSV(file);
+    }
+  });
 }
+
+function parseExcelFile(file, callback){
+  var reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      var data = new Uint8Array(e.target.result);
+      var workbook = XLSX.read(data, {type:'array'});
+      var sheetName = workbook.SheetNames[0];
+      var sheet = workbook.Sheets[sheetName];
+      var rows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:''});
+      callback(rows);
+    }catch(err){
+      showErr('Erreur lecture Excel: '+err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseNTExcel(rows){
+  // Find header row - look for row containing 'Instrument' or 'Action'
+  var headerRow = -1;
+  for(var i=0;i<Math.min(rows.length,10);i++){
+    var r = rows[i].join(';').toLowerCase();
+    if(r.includes('instrument')||r.includes('action')){headerRow=i;break;}
+  }
+  if(headerRow===-1){showErr('En-tête non trouvé dans le fichier Excel NinjaTrader.');return;}
+
+  // Get headers
+  var headers = rows[headerRow].map(function(h){return (h||'').toString().trim().toLowerCase();});
+  
+  // Find column indices
+  var iInstr = headers.findIndex(function(h){return h.includes('instrument');});
+  var iAction = headers.findIndex(function(h){return h==='action'||h.includes('action');});
+  var iQty = headers.findIndex(function(h){return h.includes('quantit')||h==='qty';});
+  var iPrix = headers.findIndex(function(h){return h==='prix'||h.includes('price')||h.includes('prix');});
+  var iHeure = headers.findIndex(function(h){return h==='heure'||h.includes('time')||h.includes('heure');});
+  var iEX = headers.findIndex(function(h){return h.includes('e / x')||h==='e/x'||h.includes('e /');});
+  var iNom = headers.findIndex(function(h){return h==='nom'||h==='name';});
+  var iCompte = headers.findIndex(function(h){return h==='compte'||h.includes('account');});
+
+  console.log('Headers found:', {iInstr,iAction,iQty,iPrix,iHeure,iEX,iNom,iCompte});
+
+  // Parse data rows
+  var dataRows = [];
+  for(var i=headerRow+1;i<rows.length;i++){
+    var row = rows[i];
+    if(!row||!row[iInstr||0])continue;
+    dataRows.push(row);
+  }
+
+  // Filter out Externe
+  dataRows = dataRows.filter(function(r){
+    return (r[iNom]||'').toString().toLowerCase()!=='externe';
+  });
+
+  // Sequential parse - same as CSV parser
+  var trades = [];
+  var idx = 0;
+  while(idx < dataRows.length){
+    var row = dataRows[idx];
+    var ex = (row[iEX]||'').toString().toLowerCase();
+    var nom = (row[iNom]||'').toString().trim();
+
+    if(ex.includes('entr') && nom==='Entry'){
+      // Collect all consecutive Entry rows
+      var entryRows = [];
+      while(idx < dataRows.length){
+        var r = dataRows[idx];
+        var rx = (r[iEX]||'').toString().toLowerCase();
+        var rn = (r[iNom]||'').toString().trim();
+        if(rx.includes('entr') && rn==='Entry'){entryRows.push(r);idx++;}
+        else break;
+      }
+      // Collect all exit rows until next Entry
+      var exitRows = [];
+      while(idx < dataRows.length){
+        var r = dataRows[idx];
+        var rx = (r[iEX]||'').toString().toLowerCase();
+        var rn = (r[iNom]||'').toString().trim();
+        if(!rx.includes('entr') || rn!=='Entry'){exitRows.push(r);idx++;}
+        else break;
+      }
+
+      // Calculate trade
+      var instr = (entryRows[0][iInstr]||'MGC').toString().replace(/ \d{2}-\d{2}/,'').trim();
+      var action = (entryRows[0][iAction]||'').toString().toLowerCase();
+      var side = action.includes('acheter')||action.includes('buy')?'BUY':'SELL';
+      var sumEp = entryRows.reduce(function(s,r){
+        var p = r[iPrix];
+        if(typeof p==='number') return s+p;
+        return s+(parseFloat((p||'0').toString().replace(',','.'))||0);
+      },0);
+      var avgEp = sumEp/entryRows.length;
+      var totalQty = entryRows.reduce(function(s,r){return s+(parseInt(r[iQty])||0);},0);
+      var mul = instr.includes('MGC')?10:instr.includes('MNQ')?2:1;
+
+      var totalPnl=0, lastXp=0;
+      exitRows.forEach(function(ex){
+        var xp = ex[iPrix];
+        if(typeof xp==='number'){} else xp=parseFloat((xp||'0').toString().replace(',','.'))||0;
+        var xqty = parseInt(ex[iQty])||1;
+        totalPnl += side==='BUY'?(xp-avgEp)*xqty*mul:(avgEp-xp)*xqty*mul;
+        lastXp = xp;
+      });
+      totalPnl = Math.round(totalPnl*100)/100;
+
+      // Parse date from heure
+      var heureRaw = entryRows[0][iHeure];
+      var dateStr='', timeStr='';
+      if(heureRaw){
+        var heureStr = heureRaw.toString();
+        // Excel might give us a date number or string
+        if(typeof heureRaw==='number'){
+          // Excel date serial number
+          var jsDate = new Date(Math.round((heureRaw-25569)*86400*1000));
+          dateStr = jsDate.getFullYear()+'-'+('0'+(jsDate.getMonth()+1)).slice(-2)+'-'+('0'+jsDate.getDate()).slice(-2);
+          timeStr = ('0'+jsDate.getHours()).slice(-2)+':'+('0'+jsDate.getMinutes()).slice(-2);
+        } else {
+          var parts = heureStr.split(' ');
+          if(parts[0]){
+            var dp=parts[0].split('/');
+            if(dp.length===3) dateStr=dp[2]+'-'+dp[1].padStart(2,'0')+'-'+dp[0].padStart(2,'0');
+            else dateStr=parts[0];
+          }
+          timeStr=parts[1]||'';
+        }
+      }
+
+      var hr=timeStr?parseInt(timeStr.split(':')[0]):12;
+      var session=hr>=8&&hr<10?'Europe':hr>=15&&hr<18?'US':'Autre';
+      var symbol=instr.includes('MNQ')?'NAS100':'GOLD';
+
+      trades.push({
+        date:dateStr,symbol:symbol,side:side,
+        lots:totalQty/100,entry:Math.round(avgEp*100)/100,
+        exit:lastXp||null,pnl:totalPnl,netPnl:totalPnl,
+        status:exitRows.length>0?'closed':'open',
+        session:session,emotion:'Neutre',error:''
+      });
+    } else { idx++; }
+  }
+
+  if(!trades.length){showErr('Aucun trade Entry trouvé dans le fichier Excel.');return;}
+  
+  // Bulk insert
+  fetch(API+'/bulk',{
+    method:'POST',
+    headers:authHeaders(),
+    body:JSON.stringify(trades)
+  }).then(function(r){return r.json();})
+  .then(function(res){
+    showSuccess((res.inserted||trades.length)+' trades importés depuis Excel NinjaTrader !');
+    loadTrades();
+  }).catch(function(e){
+    showErr('Erreur import: '+e.message);
+  });
+}
+
 </script>
 
 <div id="login-overlay" style="display:none;position:fixed;inset:0;background:#060606;z-index:9999;align-items:center;justify-content:center">
