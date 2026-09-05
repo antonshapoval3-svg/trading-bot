@@ -514,7 +514,7 @@ function showPage(p,el){
   document.getElementById('page-'+p).classList.add('active');
   document.getElementById('page-title').textContent=PAGE_TITLES[p]||p;
   if(el)el.classList.add('active');
-  if(p==='dashboard')renderDashboard();
+  if(p==='dashboard'){renderDashboard();renderCalendar();}
   if(p==='trades')renderTrades();
   if(p==='notes')renderNotes();
 }
