@@ -36,7 +36,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 .btn-add{background:var(--purple);color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:var(--font)}
 .btn-add:hover{background:#6d28d9}
 .content{padding:24px;flex:1}
-.page{display:none}.page.active{display:block}
+.page{visibility:hidden;position:absolute;pointer-events:none}.page.active{visibility:visible;position:relative;pointer-events:auto}.page.active{display:block}
 /* KPI CARDS */
 .kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:20px}
 .kpi-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px 18px;position:relative;overflow:hidden}
