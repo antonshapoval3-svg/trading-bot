@@ -523,7 +523,7 @@ function updateCount(){document.getElementById('trade-count').textContent=trades
 async function loadTrades(){
   try{
     var res=await fetch(API,{headers:authHeaders()});
-    if(res.status===401){var lo=document.getElementById('login-overlay');if(lo)lo.style.display='flex';return;}
+    if(res.status===401){authToken=null;localStorage.removeItem('tj_token');sessionStorage.removeItem('tj_token');var lo=document.getElementById('login-overlay');if(lo)lo.style.display='flex';return;}
     var txt=await res.text();try{trades=JSON.parse(txt);}catch(e){return;}
     trades.forEach(function(t){if(t._id&&!t.id)t.id=t._id.toString();});
     updateCount();renderDashboard();
@@ -1034,9 +1034,9 @@ var DEFAULT_ACCOUNTS=[
   {id:'apex-50k-1',name:'🏆 APEX $50K',type:'apex-50k'},
   {id:'apex-100k-1',name:'🏆 APEX $100K',type:'apex-100k'}
 ];
-function loadAccounts(){var s=localStorage.getItem('tj_accounts');if(s){try{return JSON.parse(s);}catch(e){}}return DEFAULT_ACCOUNTS.map(function(a){return Object.assign({},a);});}
+function loadAccounts(){try{var s=localStorage.getItem('tj_accounts');if(s){var parsed=JSON.parse(s);if(Array.isArray(parsed)&&parsed.length>0)return parsed;}}catch(e){}return DEFAULT_ACCOUNTS.map(function(a){return Object.assign({},a);});}
 function saveAccounts(a){localStorage.setItem('tj_accounts',JSON.stringify(a));}
-function getAccountRules(id){var accounts=loadAccounts();var acc=accounts.find(function(a){return a.id===id;});if(!acc)return null;var t=FIRM_TEMPLATES[acc.type];if(!t)return null;return Object.assign({},t,{label:acc.name});}
+function getAccountRules(id){try{var accounts=loadAccounts();if(!accounts||!Array.isArray(accounts))return null;var acc=accounts.find(function(a){return a.id===id;});if(!acc)return null;var t=FIRM_TEMPLATES[acc.type];if(!t)return null;return Object.assign({},t,{label:acc.name});}catch(e){return null;}}
 function getAccountTrades(){return trades.filter(function(t){var ta=t.account||'perso';if(currentAccount==='perso')return ta==='perso'||!ta;return ta===currentAccount;});}
 function buildAccountSelector(){var accounts=loadAccounts();var sel=document.getElementById('account-selector');if(!sel)return;sel.innerHTML=accounts.map(function(a){return'<option value="'+a.id+'"'+(a.id===currentAccount?' selected':'')+'>'+a.name+'</option>';}).join('');}
 function switchAccount(account){currentAccount=account;localStorage.setItem('tj_account',account);var lbl=document.getElementById('account-label');if(lbl){var r=getAccountRules(account);lbl.textContent=r?r.label:'Perso';}var sel=document.getElementById('account-selector');if(sel)sel.value=account;renderDashboard();renderTrades();}
@@ -1072,6 +1072,7 @@ function deleteCurrentAccount(){
 
 // ── APEX DASHBOARD ─────────────────────────────────────────────
 function updateApexDashboard(accountTrades){
+  if(!accountTrades||!Array.isArray(accountTrades))accountTrades=[];
   var rules=getAccountRules(currentAccount);
   var dash=document.getElementById('apex-dashboard');
   if(!rules||!rules.isApex||!rules.target){if(dash)dash.style.display='none';return;}
