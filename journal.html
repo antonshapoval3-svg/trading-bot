@@ -200,11 +200,6 @@ tr:hover td{background:var(--bg3)}
     <h1 id="page-title">Dashboard</h1>
     <div class="topbar-right">
       <span id="trade-count" style="font-size:12px;color:var(--text3)">0 trades</span>
-      <div style="display:flex;align-items:center;gap:6px">
-        <select id="account-selector" onchange="switchAccount(this.value)" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-size:12px;color:var(--text1);font-family:inherit;cursor:pointer;outline:none;max-width:160px"></select>
-        <button onclick="showAddAccountModal()" title="Ajouter un compte" style="background:var(--blue);border:none;border-radius:8px;width:28px;height:28px;cursor:pointer;color:#fff;font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0">+</button>
-        <button onclick="deleteCurrentAccount()" title="Supprimer ce compte" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;width:28px;height:28px;cursor:pointer;color:var(--red);font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">🗑</button>
-      </div>
       <button class="btn-add" onclick="showPage('add',null)"><i class="ti ti-plus" style="font-size:15px"></i> Add Trade</button>
       <button id="logout-btn" onclick="logout()" title="Déconnecter" style="display:none;background:transparent;border:1px solid #222;border-radius:8px;padding:7px 10px;cursor:pointer;color:#444;font-size:13px"><i class="ti ti-logout"></i></button>
     </div>
@@ -221,75 +216,6 @@ tr:hover td{background:var(--bg3)}
         <button onclick="editBalance()" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:7px 12px;color:var(--text2);font-size:12px;cursor:pointer;font-family:inherit">✏️ Modifier</button>
       </div>
       <div class="kpi-grid" id="kpi-main"></div>
-      <!-- APEX DASHBOARD -->
-      <div id="apex-dashboard" style="display:none;margin-bottom:14px">
-        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:10px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-            <div style="font-size:14px;font-weight:500;color:var(--text1)" id="apex-title">🏆 APEX Dashboard</div>
-            <div id="apex-status-badge" style="font-size:11px;padding:3px 10px;border-radius:20px;font-weight:500">EN COURS</div>
-          </div>
-          <!-- Progress bars -->
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
-            <!-- Objectif -->
-            <div style="background:var(--bg3);border-radius:8px;padding:12px">
-              <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:6px">
-                <span style="color:var(--text3)">🎯 Objectif profit</span>
-                <span id="apex-obj-val" style="color:var(--green);font-weight:600">$0 / $0</span>
-              </div>
-              <div style="height:8px;background:var(--bg2);border-radius:4px;overflow:hidden">
-                <div id="apex-obj-bar" style="height:100%;background:var(--green);border-radius:4px;transition:width .4s;width:0%"></div>
-              </div>
-              <div id="apex-obj-pct" style="font-size:10px;color:var(--text3);margin-top:4px;text-align:right">0%</div>
-            </div>
-            <!-- Day Drawdown -->
-            <div style="background:var(--bg3);border-radius:8px;padding:12px">
-              <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:6px">
-                <span style="color:var(--text3)">📉 Stop journalier</span>
-                <span id="apex-dd-val" style="color:var(--text1);font-weight:600">$0 / $0</span>
-              </div>
-              <div style="height:8px;background:var(--bg2);border-radius:4px;overflow:hidden">
-                <div id="apex-dd-bar" style="height:100%;background:var(--red);border-radius:4px;transition:width .4s;width:0%"></div>
-              </div>
-              <div id="apex-dd-pct" style="font-size:10px;color:var(--text3);margin-top:4px;text-align:right">0% utilisé</div>
-            </div>
-          </div>
-          <!-- Trailing Drawdown -->
-          <div style="background:var(--bg3);border-radius:8px;padding:12px;margin-bottom:10px">
-            <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:6px">
-              <span style="color:var(--text3)">⚠️ Trailing Drawdown (max)</span>
-              <span id="apex-tdd-val" style="font-weight:600">$0 restant / $0 max</span>
-            </div>
-            <div style="height:8px;background:var(--bg2);border-radius:4px;overflow:hidden">
-              <div id="apex-tdd-bar" style="height:100%;background:var(--gold);border-radius:4px;transition:width .4s;width:0%"></div>
-            </div>
-            <div id="apex-tdd-pct" style="font-size:10px;color:var(--text3);margin-top:4px;text-align:right">0% utilisé</div>
-          </div>
-          <!-- Stats grid -->
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
-            <div style="background:var(--bg3);border-radius:8px;padding:10px;text-align:center">
-              <div style="font-size:10px;color:var(--text3);margin-bottom:4px">Jours tradés</div>
-              <div id="apex-days" style="font-size:18px;font-weight:500;color:var(--text1)">0</div>
-            </div>
-            <div style="background:var(--bg3);border-radius:8px;padding:10px;text-align:center">
-              <div style="font-size:10px;color:var(--text3);margin-bottom:4px">Meilleur jour</div>
-              <div id="apex-best-day" style="font-size:18px;font-weight:500;color:var(--green)">$0</div>
-            </div>
-            <div style="background:var(--bg3);border-radius:8px;padding:10px;text-align:center">
-              <div style="font-size:10px;color:var(--text3);margin-bottom:4px">Pire jour</div>
-              <div id="apex-worst-day" style="font-size:18px;font-weight:500;color:var(--red)">$0</div>
-            </div>
-            <div style="background:var(--bg3);border-radius:8px;padding:10px;text-align:center">
-              <div style="font-size:10px;color:var(--text3);margin-bottom:4px">Max contrats</div>
-              <div id="apex-contracts" style="font-size:18px;font-weight:500;color:var(--blue)">0</div>
-            </div>
-          </div>
-          <!-- Règles -->
-          <div style="margin-top:12px;padding-top:12px;border-top:0.5px solid var(--border)">
-            <div style="font-size:11px;color:var(--text3);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Règles du challenge</div>
-            <div id="apex-rules-list" style="display:flex;flex-direction:column;gap:6px"></div>
-          </div>
-        </div>
-      </div>
       <div class="grid3">
         <div class="card" style="grid-column:span 2">
           <div class="card-title">Daily Net Cumulative P&L <span style="font-size:11px;color:var(--green)">▲ All time</span></div>
@@ -665,8 +591,7 @@ function parseCSV(file){
           status:'closed',session:session,
           emotion:'Neutre',error:'',
           strategy:(cols[3]||'').trim(),
-          entryTime:timeStr,tp2:timeStr,
-          account:currentAccount
+          entryTime:timeStr,tp2:timeStr
         });
       }
 
@@ -709,13 +634,9 @@ async function doLogin(){var nom=document.getElementById('l-nom').value.trim(),e
 async function doRegister(){var nom=document.getElementById('r-nom').value.trim(),email=document.getElementById('r-email').value.trim(),pwd=document.getElementById('r-pwd').value;var err=document.getElementById('register-err');err.style.display='none';if(!nom||!email||!pwd){err.textContent='Remplis tous les champs';err.style.display='block';return;}if(pwd.length<6){err.textContent='Trop court (6 min)';err.style.display='block';return;}try{var res=await fetch('/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nom,email,password:pwd})});var data=await res.json();if(!res.ok){err.textContent=data.error||'Erreur';err.style.display='block';return;}authToken=data.token;currentUser={nom:data.nom,email:data.email};var rem=document.getElementById('r-remember').checked;if(rem){localStorage.setItem('tj_token',authToken);localStorage.setItem('tj_user',JSON.stringify(currentUser));}else{sessionStorage.setItem('tj_token',authToken);sessionStorage.setItem('tj_user',JSON.stringify(currentUser));localStorage.removeItem('tj_token');localStorage.removeItem('tj_user');}hideLogin();loadTrades();}catch(e){err.textContent='Erreur de connexion';err.style.display='block';}}
 function logout(){authToken=null;currentUser=null;localStorage.removeItem('tj_token');localStorage.removeItem('tj_user');sessionStorage.removeItem('tj_token');sessionStorage.removeItem('tj_user');trades=[];showLogin();}
 function editBalance(){var cur=localStorage.getItem('tj_balance')||'';document.getElementById('bal-input').value=cur;document.getElementById('bal-modal').style.display='flex';setTimeout(function(){document.getElementById('bal-input').focus();},100);}
-function confirmBalance(){var val=document.getElementById('bal-input').value;localStorage.setItem('tj_balance',val);localStorage.setItem('tj_balance_'+currentAccount,val);document.getElementById('bal-modal').style.display='none';renderDashboard();}
+function confirmBalance(){var val=document.getElementById('bal-input').value;localStorage.setItem('tj_balance',val);document.getElementById('bal-modal').style.display='none';renderDashboard();}
 document.addEventListener('click',function(e){var m=document.getElementById('bal-modal');if(m&&e.target===m)m.style.display='none';});
-document.addEventListener('DOMContentLoaded',function(){var savedBal=localStorage.getItem('tj_balance');if(savedBal){var bs=document.getElementById('balance-start');if(bs)bs.textContent='$'+(parseFloat(savedBal)||0).toFixed(2);}currentAccount=localStorage.getItem('tj_account')||'perso';
-  var selEl=document.getElementById('account-selector');
-  if(selEl)selEl.value=currentAccount;
-  var lblEl=document.getElementById('account-label');
-  if(lblEl)lblEl.textContent=currentAccount==='apex'?'APEX });
+document.addEventListener('DOMContentLoaded',function(){var savedBal=localStorage.getItem('tj_balance');if(savedBal){var bs=document.getElementById('balance-start');if(bs)bs.textContent='$'+(parseFloat(savedBal)||0).toFixed(2);}if(!authToken){showLogin();}else{hideLogin();loadTrades();}});
 
 function showPreview(data){
   var wrap=document.getElementById('preview-wrap'),t=document.getElementById('preview-table');
@@ -767,7 +688,7 @@ function filterTrades(mode,btn){filterMode=mode;document.querySelectorAll('.filt
 
 function renderTrades(){
   var tbody=document.getElementById('trades-body');
-  var list=getAccountTrades();
+  var list=trades;
   if(filterMode==='open')list=trades.filter(function(t){return t.status==='open';});
   else if(filterMode==='closed')list=trades.filter(function(t){return t.status==='closed';});
   else if(filterMode==='BUY')list=trades.filter(function(t){return t.side==='BUY';});
@@ -950,8 +871,7 @@ function getPhotoData(imgId){var img=document.getElementById(imgId);return img&&
 function showPhotoModal(src){document.getElementById('photo-modal-img').src=src;document.getElementById('photo-modal').classList.add('show');}
 
 function renderDashboard(){
-  var accountTrades=getAccountTrades();
-  var closed=accountTrades.filter(function(t){return t.status==='closed';});
+  var closed=trades.filter(function(t){return t.status==='closed';});
   var totalPnl=closed.reduce(function(s,t){return s+(t.pnl||0);},0);
   var totalNet=closed.reduce(function(s,t){return s+(t.netPnl!=null?t.netPnl:t.pnl||0);},0);
   var wins=closed.filter(function(t){return t.pnl>0;});
@@ -984,7 +904,6 @@ function renderDashboard(){
   // Score
   var score=Math.min(100,Math.round((wr*0.4)+(Math.min(pf,3)/3*30)+(Math.min(rr,3)/3*30)));
   var sn=document.getElementById('score-num');if(sn)sn.textContent=score||0;
-  updateApexDashboard(accountTrades);
   var sb=document.getElementById('score-bar');if(sb)sb.style.width=score+'%';
 
   // Capital chart
@@ -1310,8 +1229,7 @@ function parseCSVAdd(file){
         pnl:profit,netPnl:profit,
         status:'closed',session:session,
         emotion:'Neutre',error:'',
-        entryTime:timeStr,tp2:timeStr,
-        account:currentAccount
+        entryTime:timeStr,tp2:timeStr
       });
     }
 
@@ -1330,233 +1248,6 @@ function parseNTExcelAdd(rows){
   // Same as parseNTExcel but without clearing
   parseNTExcel(rows); // parseNTExcel already uses bulkInsert without clearing
 }
-
-
-var currentAccount = localStorage.getItem('tj_account') || 'perso';
-
-function switchAccount(account){
-  currentAccount = account;
-  localStorage.setItem('tj_account', account);
-  // Update account label
-  var lbl = document.getElementById('account-label');
-  if(lbl) lbl.textContent = account === 'apex' ? 'APEX $50K' : 'Perso';
-  // Update selector
-  var sel = document.getElementById('account-selector');
-  if(sel) sel.value = account;
-  // Reload balance for this account
-  var savedBal = localStorage.getItem('tj_balance_'+account);
-  if(savedBal){
-    var bs=document.getElementById('balance-start');
-    if(bs)bs.textContent=String.fromCharCode(36)+(parseFloat(savedBal)||0).toFixed(2);
-  }
-  // Reload trades filtered by account
-  renderDashboard();
-  var page=document.querySelector('.page.active');
-  if(page&&page.id==='page-trades') renderTrades();
-}
-
-function getAccountTrades(){
-  return trades.filter(function(t){
-    var ta = t.account || 'perso';
-    return ta === currentAccount;
-  });
-}
-
-
-// APEX_RULES moved to FIRM_TEMPLATES
-
-// updateApexDashboard moved below
-
-// ── ACCOUNT MANAGEMENT ────────────────────────────────
-// Default accounts always present
-var DEFAULT_ACCOUNTS = [
-  { id:'perso', name:'💼 Compte Perso', type:'perso' },
-  { id:'apex-25k-1', name:'🏆 APEX $25K', type:'apex-25k' },
-  { id:'apex-50k-1', name:'🏆 APEX $50K', type:'apex-50k' },
-  { id:'apex-100k-1', name:'🏆 APEX $100K', type:'apex-100k' }
-];
-
-// Prop firm rules templates
-var FIRM_TEMPLATES = {
-  'perso':      { size:10000,  target:null, maxDD:null, dayDD:null, maxContracts:null, label:'Perso', isApex:false },
-  'apex-25k':   { size:25000,  target:1500, maxDD:1500, dayDD:500,  maxContracts:3,   label:'APEX $25K',   isApex:true },
-  'apex-50k':   { size:50000,  target:3000, maxDD:2500, dayDD:1000, maxContracts:10,  label:'APEX $50K',   isApex:true },
-  'apex-100k':  { size:100000, target:6000, maxDD:5000, dayDD:2000, maxContracts:14,  label:'APEX $100K',  isApex:true },
-  'ftmo-10k':   { size:10000,  target:1000, maxDD:500,  dayDD:200,  maxContracts:2,   label:'FTMO $10K',   isApex:true },
-  'ftmo-25k':   { size:25000,  target:2500, maxDD:1250, dayDD:500,  maxContracts:5,   label:'FTMO $25K',   isApex:true },
-  'ftmo-50k':   { size:50000,  target:5000, maxDD:2500, dayDD:1000, maxContracts:10,  label:'FTMO $50K',   isApex:true },
-  'mff-50k':    { size:50000,  target:3000, maxDD:2500, dayDD:1000, maxContracts:10,  label:'MFF $50K',    isApex:true },
-  'custom':     { size:50000,  target:3000, maxDD:2500, dayDD:1000, maxContracts:10,  label:'Custom',      isApex:true }
-};
-
-function loadAccounts(){
-  var saved = localStorage.getItem('tj_accounts');
-  if(saved){ try{ return JSON.parse(saved); }catch(e){} }
-  return DEFAULT_ACCOUNTS.map(function(a){ return Object.assign({},a); });
-}
-
-function saveAccounts(accounts){
-  localStorage.setItem('tj_accounts', JSON.stringify(accounts));
-}
-
-function buildAccountSelector(){
-  var accounts = loadAccounts();
-  var sel = document.getElementById('account-selector');
-  if(!sel) return;
-  sel.innerHTML = accounts.map(function(a){
-    return '<option value="'+a.id+'"'+(a.id===currentAccount?' selected':'')+'>'+a.name+'</option>';
-  }).join('');
-}
-
-function showAddAccountModal(){
-  document.getElementById('add-account-modal').style.display='flex';
-  document.getElementById('new-acc-name').value='';
-  document.getElementById('new-acc-type').value='apex-50k';
-  document.getElementById('custom-rules').style.display='none';
-}
-
-document.addEventListener('change', function(e){
-  if(e.target && e.target.id==='new-acc-type'){
-    document.getElementById('custom-rules').style.display = e.target.value==='custom'?'block':'none';
-  }
-});
-
-function createAccount(){
-  var name = document.getElementById('new-acc-name').value.trim();
-  var type = document.getElementById('new-acc-type').value;
-  if(!name){ alert('Donne un nom au compte'); return; }
-
-  var accounts = loadAccounts();
-  var id = type+'-'+Date.now();
-
-  // Custom rules
-  var customRules = null;
-  if(type==='custom'){
-    customRules = {
-      size: parseInt(document.getElementById('new-acc-size').value)||50000,
-      target: parseInt(document.getElementById('new-acc-target').value)||3000,
-      maxDD: parseInt(document.getElementById('new-acc-maxdd').value)||2500,
-      dayDD: parseInt(document.getElementById('new-acc-daydd').value)||1000,
-      maxContracts: parseInt(document.getElementById('new-acc-contracts').value)||10
-    };
-  }
-
-  accounts.push({ id:id, name:name, type:type, customRules:customRules });
-  saveAccounts(accounts);
-  document.getElementById('add-account-modal').style.display='none';
-  buildAccountSelector();
-  switchAccount(id);
-}
-
-function deleteCurrentAccount(){
-  if(currentAccount==='perso'){ alert('Impossible de supprimer le compte principal'); return; }
-  if(!confirm('Supprimer ce compte ? Les trades ne seront pas effacés.')) return;
-  var accounts = loadAccounts().filter(function(a){ return a.id!==currentAccount; });
-  saveAccounts(accounts);
-  switchAccount('perso');
-  buildAccountSelector();
-}
-
-function getAccountRules(accountId){
-  var accounts = loadAccounts();
-  var acc = accounts.find(function(a){ return a.id===accountId; });
-  if(!acc) return null;
-  if(acc.customRules) return Object.assign({label:acc.name, isApex:true}, acc.customRules);
-  var template = FIRM_TEMPLATES[acc.type];
-  if(!template) return null;
-  return Object.assign({}, template, {label:acc.name});
-}
-
-function updateApexDashboard(accountTrades){
-  var rules = getAccountRules(currentAccount);
-  var dash = document.getElementById('apex-dashboard');
-  if(!rules||!rules.isApex||!rules.target){ if(dash)dash.style.display='none'; return; }
-  if(dash)dash.style.display='block';
-
-  var title=document.getElementById('apex-title');
-  if(title)title.textContent='🏆 '+rules.label+' — Challenge';
-
-  var totalPnl=accountTrades.reduce(function(s,t){return s+((t.netPnl!=null?t.netPnl:t.pnl)||0);},0);
-
-  // Objective
-  var objPct=Math.min(Math.max(totalPnl/rules.target*100,0),100);
-  var objEl=document.getElementById('apex-obj-val');
-  var objBar=document.getElementById('apex-obj-bar');
-  var objPctEl=document.getElementById('apex-obj-pct');
-  if(objEl)objEl.textContent=String.fromCharCode(36)+totalPnl.toFixed(0)+' / '+String.fromCharCode(36)+rules.target;
-  if(objBar){objBar.style.width=objPct+'%';objBar.style.background=totalPnl>=rules.target?'var(--green)':'var(--blue)';}
-  if(objPctEl)objPctEl.textContent=objPct.toFixed(1)+'%';
-
-  // Day DD
-  var today=new Date().toISOString().split('T')[0];
-  var todayPnl=accountTrades.filter(function(t){return t.date===today;}).reduce(function(s,t){return s+((t.netPnl!=null?t.netPnl:t.pnl)||0);},0);
-  var dayUsed=Math.abs(Math.min(todayPnl,0));
-  var dayPct=Math.min(dayUsed/rules.dayDD*100,100);
-  var ddEl=document.getElementById('apex-dd-val');
-  var ddBar=document.getElementById('apex-dd-bar');
-  var ddPctEl=document.getElementById('apex-dd-pct');
-  if(ddEl){ddEl.textContent=String.fromCharCode(36)+dayUsed.toFixed(0)+' / '+String.fromCharCode(36)+rules.dayDD;ddEl.style.color=dayPct>80?'var(--red)':dayPct>50?'var(--gold)':'var(--green)';}
-  if(ddBar){ddBar.style.width=dayPct+'%';ddBar.style.background=dayPct>80?'var(--red)':dayPct>50?'var(--gold)':'var(--blue)';}
-  if(ddPctEl)ddPctEl.textContent=dayPct.toFixed(1)+'% utilisé';
-
-  // Trailing DD
-  var worstPnl=Math.min(totalPnl,0);
-  var tddUsed=Math.abs(Math.min(worstPnl,0));
-  var tddPct=Math.min(tddUsed/rules.maxDD*100,100);
-  var tddRemain=rules.maxDD-tddUsed;
-  var tddEl=document.getElementById('apex-tdd-val');
-  var tddBar=document.getElementById('apex-tdd-bar');
-  var tddPctEl=document.getElementById('apex-tdd-pct');
-  if(tddEl){tddEl.textContent=String.fromCharCode(36)+tddRemain.toFixed(0)+' restant / '+String.fromCharCode(36)+rules.maxDD;tddEl.style.color=tddPct>80?'var(--red)':tddPct>50?'var(--gold)':'var(--text1)';}
-  if(tddBar){tddBar.style.width=tddPct+'%';tddBar.style.background=tddPct>80?'var(--red)':tddPct>50?'var(--gold)':'var(--gold)';}
-  if(tddPctEl)tddPctEl.textContent=tddPct.toFixed(1)+'% utilisé';
-
-  // Day stats
-  var dayPnls={};
-  accountTrades.forEach(function(t){if(!t.date)return;if(!dayPnls[t.date])dayPnls[t.date]=0;dayPnls[t.date]+=((t.netPnl!=null?t.netPnl:t.pnl)||0);});
-  var dayVals=Object.values(dayPnls);
-  var days=Object.keys(dayPnls);
-  var bestDay=dayVals.length?Math.max.apply(null,dayVals):0;
-  var worstDay=dayVals.length?Math.min.apply(null,dayVals):0;
-
-  var daysEl=document.getElementById('apex-days');if(daysEl)daysEl.textContent=days.length;
-  var bestEl=document.getElementById('apex-best-day');if(bestEl){bestEl.textContent=String.fromCharCode(36)+bestDay.toFixed(0);bestEl.style.color='var(--green)';}
-  var worstEl=document.getElementById('apex-worst-day');if(worstEl){worstEl.textContent=String.fromCharCode(36)+worstDay.toFixed(0);worstEl.style.color='var(--red)';}
-  var contEl=document.getElementById('apex-contracts');if(contEl)contEl.textContent=rules.maxContracts;
-
-  // Status
-  var badge=document.getElementById('apex-status-badge');
-  if(badge){
-    var failed=tddUsed>=rules.maxDD||dayUsed>=rules.dayDD;
-    var passed=totalPnl>=rules.target;
-    if(failed){badge.textContent='❌ ÉCHOUÉ';badge.style.background='rgba(247,37,133,.2)';badge.style.color='var(--red)';}
-    else if(passed){badge.textContent='✅ OBJECTIF ATTEINT';badge.style.background='rgba(6,214,160,.2)';badge.style.color='var(--green)';}
-    else{badge.textContent='⏳ EN COURS';badge.style.background='rgba(59,130,246,.15)';badge.style.color='var(--blue)';}
-  }
-
-  // Rules checklist
-  var rulesList=document.getElementById('apex-rules-list');
-  if(rulesList){
-    var items=[
-      {label:'Objectif profit '+String.fromCharCode(36)+rules.target, ok:totalPnl>=rules.target},
-      {label:'Trailing Drawdown max '+String.fromCharCode(36)+rules.maxDD, ok:tddUsed<rules.maxDD},
-      {label:'Stop journalier max '+String.fromCharCode(36)+rules.dayDD, ok:dayUsed<rules.dayDD},
-      {label:'Max '+rules.maxContracts+' contrats', ok:true},
-      {label:'Positions fermées avant fin de journée', ok:true}
-    ];
-    rulesList.innerHTML=items.map(function(r){
-      return '<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2)">'+
-        '<span>'+(r.ok?'✅':'❌')+'</span>'+
-        '<span style="color:'+(r.ok?'var(--text2)':'var(--red)')+'">'+r.label+'</span>'+
-      '</div>';
-    }).join('');
-  }
-}
-
-// Init accounts on load
-document.addEventListener('DOMContentLoaded', function(){
-  buildAccountSelector();
-});
 
 </script>
 
@@ -1591,57 +1282,6 @@ document.addEventListener('DOMContentLoaded', function(){
     <input id="bal-input" type="number" inputmode="numeric" placeholder="10000" style="width:100%;background:#0a0a0a;border:1px solid #1e1e1e;border-radius:8px;padding:14px;font-size:24px;font-weight:500;color:#06d6a0;text-align:center;outline:none;font-family:inherit;box-sizing:border-box">
     <button onclick="confirmBalance()" style="width:100%;padding:12px;background:#06d6a0;color:#000;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:12px">Confirmer</button>
     <button onclick="document.getElementById('bal-modal').style.display='none'" style="width:100%;padding:10px;background:none;border:none;color:#444;font-size:13px;cursor:pointer;margin-top:6px;font-family:inherit">Annuler</button>
-  </div>
-</div>
-
-<!-- Add Account Modal -->
-<div id="add-account-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9997;align-items:center;justify-content:center">
-  <div style="background:#0f0f0f;border:1px solid #1e1e1e;border-radius:14px;padding:24px;width:90%;max-width:320px">
-    <div style="font-size:14px;font-weight:500;color:#fff;margin-bottom:16px">➕ Nouveau compte</div>
-    <div style="margin-bottom:10px">
-      <label style="font-size:11px;color:#444;display:block;margin-bottom:4px">Nom du compte</label>
-      <input id="new-acc-name" type="text" placeholder="ex: APEX $25K #2" style="width:100%;background:#0a0a0a;border:1px solid #1e1e1e;border-radius:8px;padding:10px 12px;font-size:13px;color:#fff;outline:none;font-family:inherit;box-sizing:border-box">
-    </div>
-    <div style="margin-bottom:16px">
-      <label style="font-size:11px;color:#444;display:block;margin-bottom:4px">Type de compte</label>
-      <select id="new-acc-type" style="width:100%;background:#0a0a0a;border:1px solid #1e1e1e;border-radius:8px;padding:10px 12px;font-size:13px;color:#fff;outline:none;font-family:inherit;box-sizing:border-box">
-        <option value="perso">💼 Compte Personnel</option>
-        <option value="apex-25k">🏆 APEX $25K</option>
-        <option value="apex-50k">🏆 APEX $50K</option>
-        <option value="apex-100k">🏆 APEX $100K</option>
-        <option value="ftmo-10k">📊 FTMO $10K</option>
-        <option value="ftmo-25k">📊 FTMO $25K</option>
-        <option value="ftmo-50k">📊 FTMO $50K</option>
-        <option value="mff-50k">📈 My Funded Futures $50K</option>
-        <option value="custom">⚙️ Personnalisé</option>
-      </select>
-    </div>
-    <div id="custom-rules" style="display:none;margin-bottom:16px">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div>
-          <label style="font-size:11px;color:#444;display:block;margin-bottom:4px">Taille ($)</label>
-          <input id="new-acc-size" type="number" placeholder="50000" style="width:100%;background:#0a0a0a;border:1px solid #1e1e1e;border-radius:8px;padding:8px;font-size:12px;color:#fff;outline:none;font-family:inherit;box-sizing:border-box">
-        </div>
-        <div>
-          <label style="font-size:11px;color:#444;display:block;margin-bottom:4px">Objectif ($)</label>
-          <input id="new-acc-target" type="number" placeholder="3000" style="width:100%;background:#0a0a0a;border:1px solid #1e1e1e;border-radius:8px;padding:8px;font-size:12px;color:#fff;outline:none;font-family:inherit;box-sizing:border-box">
-        </div>
-        <div>
-          <label style="font-size:11px;color:#444;display:block;margin-bottom:4px">Max DD ($)</label>
-          <input id="new-acc-maxdd" type="number" placeholder="2500" style="width:100%;background:#0a0a0a;border:1px solid #1e1e1e;border-radius:8px;padding:8px;font-size:12px;color:#fff;outline:none;font-family:inherit;box-sizing:border-box">
-        </div>
-        <div>
-          <label style="font-size:11px;color:#444;display:block;margin-bottom:4px">Day DD ($)</label>
-          <input id="new-acc-daydd" type="number" placeholder="1000" style="width:100%;background:#0a0a0a;border:1px solid #1e1e1e;border-radius:8px;padding:8px;font-size:12px;color:#fff;outline:none;font-family:inherit;box-sizing:border-box">
-        </div>
-        <div>
-          <label style="font-size:11px;color:#444;display:block;margin-bottom:4px">Max contrats</label>
-          <input id="new-acc-contracts" type="number" placeholder="10" style="width:100%;background:#0a0a0a;border:1px solid #1e1e1e;border-radius:8px;padding:8px;font-size:12px;color:#fff;outline:none;font-family:inherit;box-sizing:border-box">
-        </div>
-      </div>
-    </div>
-    <button onclick="createAccount()" style="width:100%;padding:11px;background:#3b82f6;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit">Créer le compte</button>
-    <button onclick="document.getElementById('add-account-modal').style.display='none'" style="width:100%;padding:10px;background:none;border:none;color:#444;font-size:13px;cursor:pointer;margin-top:6px;font-family:inherit">Annuler</button>
   </div>
 </div>
 </body>
