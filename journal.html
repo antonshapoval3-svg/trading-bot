@@ -1041,8 +1041,34 @@ function getAccountTrades(){return trades.filter(function(t){var ta=t.account||'
 function buildAccountSelector(){var accounts=loadAccounts();var sel=document.getElementById('account-selector');if(!sel)return;sel.innerHTML=accounts.map(function(a){return'<option value="'+a.id+'"'+(a.id===currentAccount?' selected':'')+'>'+a.name+'</option>';}).join('');}
 function switchAccount(account){currentAccount=account;localStorage.setItem('tj_account',account);var lbl=document.getElementById('account-label');if(lbl){var r=getAccountRules(account);lbl.textContent=r?r.label:'Perso';}var sel=document.getElementById('account-selector');if(sel)sel.value=account;renderDashboard();renderTrades();}
 function showAddAccountModal(){document.getElementById('add-account-modal').style.display='flex';document.getElementById('new-acc-name').value='';}
-function createAccount(){var name=document.getElementById('new-acc-name').value.trim();var type=document.getElementById('new-acc-type').value;if(!name){alert('Donne un nom au compte');return;}var accounts=loadAccounts();var id=type+'-'+Date.now();accounts.push({id:id,name:name,type:type});saveAccounts(accounts);document.getElementById('add-account-modal').style.display='none';buildAccountSelector();switchAccount(id);}
-function deleteCurrentAccount(){if(currentAccount==='perso'){alert('Impossible de supprimer le compte principal');return;}if(!confirm('Supprimer ce compte ?'))return;var accounts=loadAccounts().filter(function(a){return a.id!==currentAccount;});saveAccounts(accounts);switchAccount('perso');buildAccountSelector();}
+function createAccount(){
+  var name=document.getElementById('new-acc-name').value.trim();
+  var type=document.getElementById('new-acc-type').value;
+  if(!name){showErr('Donne un nom au compte');return;}
+  var accounts=loadAccounts();
+  var id=type+'-'+Date.now();
+  accounts.push({id:id,name:name,type:type});
+  saveAccounts(accounts);
+  document.getElementById('add-account-modal').style.display='none';
+  buildAccountSelector();
+  // Switch to new account
+  currentAccount=id;
+  localStorage.setItem('tj_account',id);
+  var sel=document.getElementById('account-selector');if(sel)sel.value=id;
+  var lbl=document.getElementById('account-label');if(lbl){var r=getAccountRules(id);lbl.textContent=r?r.label:name;}
+  loadTrades();
+  showSuccess('Compte "'+name+'" créé !');
+}
+function deleteCurrentAccount(){
+  if(currentAccount==='perso'){alert('Impossible de supprimer le compte principal');return;}
+  if(!confirm('Supprimer ce compte "'+currentAccount+'" ? Les trades ne seront pas effacés.'))return;
+  var accounts=loadAccounts().filter(function(a){return a.id!==currentAccount;});
+  saveAccounts(accounts);
+  currentAccount='perso';
+  localStorage.setItem('tj_account','perso');
+  buildAccountSelector();
+  loadTrades();
+}
 
 // ── APEX DASHBOARD ─────────────────────────────────────────────
 function updateApexDashboard(accountTrades){
