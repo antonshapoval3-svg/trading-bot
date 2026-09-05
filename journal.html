@@ -482,8 +482,7 @@ async function loadTrades(){
     trades.forEach(function(t){if(t._id&&!t.id)t.id=t._id.toString();});
     updateCount();renderDashboard();
     var page=document.querySelector('.page.active');
-    if(!page||!page.classList.contains('active')){showPage('dashboard',document.querySelector('.nav-item[onclick*="dashboard"]'));}
-    else if(page.id==='page-trades')renderTrades();
+    if(page&&page.id==='page-trades')renderTrades();
   }catch(e){console.error('Load error:',e);}
 }
 
