@@ -483,7 +483,7 @@ async function loadTrades(){
     updateCount();
     // Ensure dashboard is visible
     var activePage=document.querySelector('.page.active');
-    if(!activePage)showPage('dashboard',document.querySelector('.nav-item'));
+    if(true||!activePage)showPage('dashboard',document.querySelector('.nav-item'));
     renderDashboard();
     var page=document.querySelector('.page.active');
     if(page&&page.id==='page-trades')renderTrades();
