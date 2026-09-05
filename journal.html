@@ -480,7 +480,11 @@ async function loadTrades(){
     if(res.status===401){authToken=null;localStorage.removeItem('tj_token');var lo=document.getElementById('login-overlay');if(lo)lo.style.display='flex';return;}
     var txt=await res.text();try{trades=JSON.parse(txt);}catch(e){return;}
     trades.forEach(function(t){if(t._id&&!t.id)t.id=t._id.toString();});
-    updateCount();renderDashboard();showPage('dashboard',document.querySelector('.nav-item'));
+    updateCount();
+    // Ensure dashboard is visible
+    var activePage=document.querySelector('.page.active');
+    if(!activePage)showPage('dashboard',document.querySelector('.nav-item'));
+    renderDashboard();
     var page=document.querySelector('.page.active');
     if(page&&page.id==='page-trades')renderTrades();
   }catch(e){console.error('Load error:',e);}
