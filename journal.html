@@ -172,6 +172,15 @@ tr:hover td{background:var(--bg3)}
 </head>
 <body>
 <!-- SIDEBAR -->
+<div id="stop-trade-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:#ff0033;padding:14px 20px;text-align:center;animation:pulse-banner 1.5s infinite">
+  <div style="font-size:18px;font-weight:800;color:#fff;letter-spacing:2px">🚦 STOP TRADE — Limite de perte journalière atteinte (-$200)</div>
+  <div style="font-size:12px;color:rgba(255,255,255,0.85);margin-top:4px">Ferme le terminal. Reviens demain. Tu as respecté ta règle. 💪</div>
+  <button onclick="document.getElementById('stop-trade-banner').style.display='none'" style="position:absolute;right:16px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.3);border:none;color:#fff;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px">Ignorer</button>
+</div>
+<style>
+@keyframes pulse-banner{0%{opacity:1;}50%{opacity:0.85;}100%{opacity:1;}}
+</style>
+
 <nav class="sidebar">
   <div class="sidebar-logo" style="flex-direction:column;align-items:flex-start;gap:10px">
     <div style="display:flex;align-items:center;gap:8px">
@@ -484,7 +493,8 @@ var API='/api/trades';
 var loading=false;
 
 function saveNotes(){localStorage.setItem('tj_notes',JSON.stringify(notes));}
-function saveBalance(){localStorage.setItem('tj_balance',document.getElementById('account-balance').value);renderDashboard();}
+function balKey(){return 'tj_balance_'+currentAccount;}
+function saveBalance(){localStorage.setItem(balKey(),document.getElementById('account-balance').value);renderDashboard();}
 function updateCount(){document.getElementById('trade-count').textContent=trades.length+' trade'+(trades.length!==1?'s':'');}
 
 // Load trades from API
@@ -513,7 +523,7 @@ async function apiDelete(id){
 }
 
 document.getElementById('f-date').value=new Date().toISOString().split('T')[0];
-var sb=localStorage.getItem('tj_balance');if(sb)document.getElementById('account-balance').value=sb;
+var sb=localStorage.getItem(balKey());if(sb)document.getElementById('account-balance').value=sb;
 loadTrades();
 
 var PAGE_TITLES={dashboard:'Dashboard',import:'Import CSV',add:'Nouveau trade',trades:'Historique',notes:'Notes'};
@@ -811,7 +821,7 @@ function renderDashboard(){
   var dMap={};closed.forEach(function(t){dMap[t.date]=(dMap[t.date]||0)+(t.pnl||0);});
   var dVals=Object.values(dMap);
   var dAvg=dVals.length?dVals.reduce(function(s,v){return s+v;},0)/dVals.length:0;
-  var balance=parseFloat(localStorage.getItem('tj_balance'))||0;
+  var balance=parseFloat(localStorage.getItem(balKey()))||0;
   var curBal=balance+totalNet;
 
   document.getElementById('kpi-main').innerHTML=
@@ -847,7 +857,7 @@ function renderDashboard(){
   assetChart=new Chart(document.getElementById('assetChart').getContext('2d'),{type:'doughnut',data:{labels:ak.length?ak:['Aucun'],datasets:[{data:ak.length?ak.map(function(k){return am[k];}):[1],backgroundColor:ak.length?ak.map(function(_,i){return COLORS[i%COLORS.length];}):['#2d3555'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{position:'bottom',labels:{font:{size:11},color:'#94a3b8',boxWidth:10,padding:10}}}}});
 
   // Balance
-  var bal=parseFloat(localStorage.getItem('tj_balance'))||0;
+  var bal=parseFloat(localStorage.getItem(balKey()))||0;
   var curBal=bal+totalNet;
   var bsEl=document.getElementById('balance-start');if(bsEl)bsEl.textContent=String.fromCharCode(36)+bal.toFixed(2);
   var bpEl=document.getElementById('balance-pnl');if(bpEl){bpEl.textContent=(totalNet>=0?'+':'')+totalNet.toFixed(2)+String.fromCharCode(36);bpEl.style.color=totalNet>=0?'var(--green)':'var(--red)';}
@@ -867,6 +877,7 @@ function renderDashboard(){
   var errEl=document.getElementById('error-stats');if(errEl){var ek=Object.keys(errMap).sort(function(a,b){return errMap[b]-errMap[a];}).slice(0,5);if(!ek.length){errEl.innerHTML='<div style="font-size:12px;color:var(--text3);text-align:center;padding:10px">Aucune erreur ✅</div>';}else{var tot2=ek.reduce(function(s,k){return s+errMap[k];},0);errEl.innerHTML=ek.map(function(k){var p=Math.round(errMap[k]/tot2*100);return'<div style="margin-bottom:5px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px"><span>'+k+'</span><span style="color:var(--text3)">'+errMap[k]+'x</span></div><div style="height:4px;background:var(--bg3);border-radius:2px;overflow:hidden"><div style="height:100%;width:'+p+'%;background:#f72585;border-radius:2px"></div></div></div>';}).join('');}}
 
   renderCalendar();
+  checkStopTrade();
 }
 
 function buildDayMap(){
@@ -1139,7 +1150,24 @@ function updateApexNav(){
 }
 
 function renderAccountSelect(){var sel=document.getElementById('account-select');if(!sel)return;sel.innerHTML='';userAccounts.forEach(function(a){var o=document.createElement('option');o.value=a.id;o.textContent=a.icon+' '+a.label;sel.appendChild(o);});sel.value=currentAccount;}
-function switchAccount(acc){currentAccount=acc;localStorage.setItem('tj_account',acc);trades=[];renderDashboard();loadTrades();}
+function checkStopTrade(){
+  var today=new Date().toISOString().slice(0,10);
+  var todayPnl=trades.filter(function(t){return t.date===today;}).reduce(function(s,t){return s+(t.pnl||0);},0);
+  var banner=document.getElementById('stop-trade-banner');
+  if(!banner)return;
+  if(todayPnl<=-200){
+    banner.style.display='block';
+    banner.querySelector('div').textContent='🚦 STOP TRADE — Limite de perte journalière atteinte ('+todayPnl.toFixed(0)+'$)';
+  }else{
+    banner.style.display='none';
+  }
+}
+
+function switchAccount(acc){currentAccount=acc;localStorage.setItem('tj_account',acc);trades=[];
+  var savedBal=localStorage.getItem(balKey());
+  var abEl=document.getElementById('account-balance');
+  if(abEl)abEl.value=savedBal||'';
+  renderDashboard();renderApexDashboard();updateApexNav();loadTrades();}
 function addAccount(){document.getElementById('add-account-modal').style.display='flex';setTimeout(function(){document.getElementById('add-account-input').focus();},100);}function confirmAddAccount(){var name=document.getElementById('add-account-input').value.trim();if(!name)return;var id='acc_'+Date.now();var icon=name.toLowerCase().includes('perso')?'💼':'🏆';userAccounts.push({id:id,label:name,icon:icon});saveAccounts();renderAccountSelect();switchAccount(id);document.getElementById('add-account-modal').style.display='none';document.getElementById('add-account-input').value='';}
 function deleteAccount(){var acc=userAccounts.find(function(a){return a.id===currentAccount;});if(!acc)return;document.getElementById('del-account-name').textContent=acc.icon+' '+acc.label;document.getElementById('del-account-modal').style.display='flex';}function confirmDeleteAccount(){document.getElementById('del-account-modal').style.display='none';var acc=userAccounts.find(function(a){return a.id===currentAccount;});if(!acc)return;function removeLocally(){userAccounts=userAccounts.filter(function(a){return a.id!==currentAccount;});if(!userAccounts.length)userAccounts=DEFAULT_ACCOUNTS.slice();saveAccounts();currentAccount=userAccounts[0].id;localStorage.setItem('tj_account',currentAccount);renderAccountSelect();trades=[];renderDashboard();showSuccess('Compte supprime.');}if(authToken){var h={'Content-Type':'application/json','Authorization':'Bearer '+authToken};fetch(API+'?account='+encodeURIComponent(currentAccount),{method:'DELETE',headers:h}).then(function(r){return r.json();}).then(function(){removeLocally();}).catch(function(){removeLocally();});}else{removeLocally();}}
 (function(){renderAccountSelect();})();
@@ -1149,8 +1177,8 @@ function hideLogin(){var lo=document.getElementById('login-overlay');if(lo)lo.st
 async function doLogin(){var nom=document.getElementById('l-nom').value.trim(),email=document.getElementById('l-email').value.trim(),pwd=document.getElementById('l-pwd').value;var err=document.getElementById('login-err');err.style.display='none';if(!nom||!email||!pwd){err.textContent='Remplis tous les champs';err.style.display='block';return;}try{var res=await fetch('/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nom,email,password:pwd})});var data=await res.json();if(!res.ok){err.textContent=data.error||'Identifiants incorrects';err.style.display='block';return;}authToken=data.token;var rem=document.getElementById('l-remember').checked;if(rem){localStorage.setItem('tj_token',authToken);}else{sessionStorage.setItem('tj_token',authToken);localStorage.removeItem('tj_token');}hideLogin();loadTrades();}catch(e){err.textContent='Erreur de connexion';err.style.display='block';}}
 async function doRegister(){var nom=document.getElementById('r-nom').value.trim(),email=document.getElementById('r-email').value.trim(),pwd=document.getElementById('r-pwd').value;var err=document.getElementById('register-err');err.style.display='none';if(!nom||!email||!pwd){err.textContent='Remplis tous les champs';err.style.display='block';return;}if(pwd.length<6){err.textContent='Mot de passe trop court (6 min)';err.style.display='block';return;}try{var res=await fetch('/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nom,email,password:pwd})});var data=await res.json();if(!res.ok){err.textContent=data.error||'Erreur';err.style.display='block';return;}authToken=data.token;var rem=document.getElementById('r-remember').checked;if(rem){localStorage.setItem('tj_token',authToken);}else{sessionStorage.setItem('tj_token',authToken);}hideLogin();loadTrades();}catch(e){err.textContent='Erreur de connexion';err.style.display='block';}}
 function logout(){authToken=null;localStorage.removeItem('tj_token');sessionStorage.removeItem('tj_token');trades=[];showLogin();}
-function editBalance(){var cur=localStorage.getItem('tj_balance')||'';document.getElementById('bal-input').value=cur;document.getElementById('bal-modal').style.display='flex';setTimeout(function(){document.getElementById('bal-input').focus();},100);}
-function confirmBalance(){var val=document.getElementById('bal-input').value;localStorage.setItem('tj_balance',val);document.getElementById('bal-modal').style.display='none';renderDashboard();}
+function editBalance(){var cur=localStorage.getItem(balKey())||'';document.getElementById('bal-input').value=cur;document.getElementById('bal-modal').style.display='flex';setTimeout(function(){document.getElementById('bal-input').focus();},100);}
+function confirmBalance(){var val=document.getElementById('bal-input').value;localStorage.setItem(balKey(),val);document.getElementById('bal-modal').style.display='none';renderDashboard();}
 document.addEventListener('click',function(e){var m=document.getElementById('bal-modal');if(m&&e.target===m)m.style.display='none';});
 function showSuccess(msg){var ok=document.getElementById('import-ok');var okm=document.getElementById('import-ok-msg');var err=document.getElementById('import-err');if(err)err.style.display='none';if(ok)ok.style.display='flex';if(okm)okm.textContent=msg;}
 function bulkInsert(trades,onSuccess){var CHUNK=10;var chunks=[];for(var i=0;i<trades.length;i+=CHUNK)chunks.push(trades.slice(i,i+CHUNK));var total=0,ci=0;function send(){if(ci>=chunks.length){onSuccess(total);return;}var chunk=chunks[ci];var h={'Content-Type':'application/json','Authorization':authToken?'Bearer '+authToken:''};fetch(API+'/bulk',{method:'POST',headers:h,body:JSON.stringify(chunk)}).then(function(r){return r.json();}).then(function(res){total+=(res.inserted||chunk.length);ci++;setTimeout(send,80);}).catch(function(){setTimeout(function(){fetch(API+'/bulk',{method:'POST',headers:h,body:JSON.stringify(chunk)}).then(function(r){return r.json();}).then(function(res){total+=(res.inserted||chunk.length);ci++;send();}).catch(function(){ci++;send();});},500);});}send();}
@@ -1162,7 +1190,7 @@ function parseCSV(file){hideAlerts();var r=new FileReader();r.onload=function(e)
 function parseCSVAdd(file){hideAlerts();var r=new FileReader();r.onload=function(e){var text=e.target.result;var lines=text.split(String.fromCharCode(10)).map(function(l){return l.trim();}).filter(function(l){return l;});if(lines.length<2){showErr('Fichier vide.');return;}var sep=lines[0].includes(';')?';':',';var trades=parseNTReportLines(lines,sep);if(!trades.length){showErr('Aucun trade trouvé.');return;}bulkInsert(trades,function(n){showSuccess(n+' trades ajoutés !');loadTrades();});};r.readAsText(file,'windows-1252');}
 function parseExcelFile(file,callback){var reader=new FileReader();reader.onload=function(e){try{var data=new Uint8Array(e.target.result);var wb=XLSX.read(data,{type:'array'});var ws=wb.Sheets[wb.SheetNames[0]];var rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});callback(rows);}catch(err){showErr('Erreur Excel: '+err.message);}};reader.readAsArrayBuffer(file);}
 function parseNTExcel(rows){function pp(v){if(typeof v==='number')return v;return parseFloat((v||'0').toString().replace(/[^0-9,.-]/g,'').replace(',','.'))||0;}function ph(v){if(!v)return{date:'',time:''};if(typeof v==='number'){var d=new Date(Math.round((v-25569)*86400*1000));return{date:d.getUTCFullYear()+'-'+('0'+(d.getUTCMonth()+1)).slice(-2)+'-'+('0'+d.getUTCDate()).slice(-2),time:('0'+d.getUTCHours()).slice(-2)+':'+('0'+d.getUTCMinutes()).slice(-2)};}var s=v.toString();var pts=s.split(' ');var ds='';if(pts[0]){var dp=pts[0].split('/');if(dp.length===3)ds=dp[2]+'-'+dp[1].padStart(2,'0')+'-'+dp[0].padStart(2,'0');else ds=pts[0];}return{date:ds,time:pts[1]||''};}var trades=[];for(var i=1;i<rows.length;i++){var row=rows[i];if(!row||!row[1])continue;var profit=pp(row[12]);var ep=pp(row[6]);var xp=pp(row[7]);var dt=ph(row[8]);var dir=(row[4]||'').toString().toLowerCase();var side=dir.includes('long')||dir.includes('buy')?'BUY':'SELL';var instr=(row[1]||'').toString().replace(/ d{2}-d{2}/,'').trim();var symbol=instr.includes('MNQ')?'NAS100':instr.includes('MGC')?'GOLD':instr;var hr=dt.time?parseInt(dt.time.split(':')[0]):12;var session=hr>=8&&hr<10?'Europe':hr>=15&&hr<18?'US':'Autre';trades.push({date:dt.date,symbol:symbol,side:side,lots:(parseInt(row[5])||1)/100,entry:ep,exit:xp,pnl:profit,netPnl:profit,status:'closed',session:session,emotion:'Neutre',error:'',entryTime:dt.time,tp2:dt.time,account:currentAccount});}if(!trades.length){showErr('Aucun trade trouvé dans Excel.');return;}bulkInsert(trades,function(n){showSuccess(n+' trades importés depuis Excel !');loadTrades();});}
-document.addEventListener('DOMContentLoaded',function(){var savedBal=localStorage.getItem('tj_balance');if(savedBal){var bs=document.getElementById('balance-start');if(bs)bs.textContent=String.fromCharCode(36)+(parseFloat(savedBal)||0).toFixed(2);}var isLocal=window.location.protocol==='file:';updateApexNav();if(isLocal){hideLogin();trades=[];renderDashboard();renderApexDashboard();}else if(!authToken){showLogin();}else{hideLogin();renderApexDashboard();loadTrades();}});
+document.addEventListener('DOMContentLoaded',function(){var savedBal=localStorage.getItem(balKey());if(savedBal){var bs=document.getElementById('balance-start');if(bs)bs.textContent=String.fromCharCode(36)+(parseFloat(savedBal)||0).toFixed(2);}var isLocal=window.location.protocol==='file:';updateApexNav();if(isLocal){hideLogin();trades=[];renderDashboard();renderApexDashboard();}else if(!authToken){showLogin();}else{hideLogin();renderApexDashboard();loadTrades();}});
 
 </script>
 
