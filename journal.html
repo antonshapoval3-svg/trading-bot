@@ -188,6 +188,7 @@ tr:hover td{background:var(--bg3)}
     </div>
   </div>
   <div class="nav-section">Menu</div>
+  <div id="nav-apex" class="nav-item" onclick="showPage('apex',this)" style="display:none"><i class="ti ti-trophy"></i> APEX Rules</div>
   <div class="nav-item active" onclick="showPage('dashboard',this)"><i class="ti ti-layout-dashboard"></i> Dashboard</div>
   <div class="nav-item" onclick="showPage('import',this)"><i class="ti ti-file-import"></i> Import CSV</div>
   <div class="nav-item" onclick="showPage('add',this)"><i class="ti ti-plus"></i> Nouveau trade</div>
@@ -276,7 +277,12 @@ tr:hover td{background:var(--bg3)}
       </div>
     </div>
 
-    <!-- IMPORT CSV -->
+    <!-- APEX DASHBOARD -->
+    <div id="page-apex" class="page">
+      <div id="apex-dashboard-content"></div>
+    </div>
+
+        <!-- IMPORT CSV -->
     <div id="page-import" class="page">
       <div class="card" style="margin-bottom:14px">
         <div class="card-title">Comment exporter depuis TradingView</div>
@@ -521,6 +527,7 @@ function showPage(p,el){
   if(p==='dashboard')renderDashboard();
   if(p==='trades')renderTrades();
   if(p==='notes')renderNotes();
+  if(p==='apex')renderApexDashboard();
 }
 
 function showPageM(p,btn){
@@ -950,6 +957,174 @@ var DEFAULT_ACCOUNTS=[{id:'perso',label:'Perso',icon:'💼'},{id:'apex25k',label
 var userAccounts=JSON.parse(localStorage.getItem('tj_accounts')||'null')||DEFAULT_ACCOUNTS;
 var currentAccount=localStorage.getItem('tj_account')||'perso';
 function saveAccounts(){localStorage.setItem('tj_accounts',JSON.stringify(userAccounts));}
+
+var APEX_RULES={
+  'apex25k':{
+    size:'25K',color:'#7c3aed',
+    evalTarget:1500,evalDrawdown:1000,dailyLoss:500,contracts:4,
+    paDailyMin:100,paConsistency:50,paMinDays:5,paSafetyNet:1100,
+    paMaxPayout:1000,paPayouts:6
+  },
+  'apex50k':{
+    size:'50K',color:'#3b82f6',
+    evalTarget:3000,evalDrawdown:2500,dailyLoss:1000,contracts:6,
+    paDailyMin:200,paConsistency:50,paMinDays:5,paSafetyNet:2600,
+    paMaxPayout:1500,paPayouts:6
+  },
+  'apex100k':{
+    size:'100K',color:'#06d6a0',
+    evalTarget:6000,evalDrawdown:3000,dailyLoss:1750,contracts:8,
+    paDailyMin:250,paConsistency:50,paMinDays:5,paSafetyNet:3100,
+    paMaxPayout:2500,paPayouts:6
+  }
+};
+
+function renderApexDashboard(){
+  var rules=APEX_RULES[currentAccount];
+  var el=document.getElementById('apex-dashboard-content');
+  if(!el)return;
+  if(!rules){el.innerHTML='<div style="color:var(--text3);padding:40px;text-align:center">Sélectionne un compte APEX pour voir les règles.</div>';return;}
+  var r=rules;
+  // Calculer la progression depuis les trades
+  var totalPnl=trades.reduce(function(s,t){return s+(t.pnl||0);},0);
+  var pct=Math.min(100,Math.max(0,(totalPnl/r.evalTarget)*100));
+  var ddPct=Math.min(100,Math.max(0,(Math.abs(Math.min(0,totalPnl))/r.evalDrawdown)*100));
+  var profitableDays={};
+  trades.forEach(function(t){
+    if(!t.date)return;
+    profitableDays[t.date]=(profitableDays[t.date]||0)+(t.pnl||0);
+  });
+  var qualDays=Object.values(profitableDays).filter(function(p){return p>=r.paDailyMin;}).length;
+  var bestDay=Math.max.apply(null,Object.values(profitableDays).concat([0]));
+  var consistencyOk=totalPnl>0?((bestDay/totalPnl)*100)<r.paConsistency:true;
+  // Trailing Drawdown calculation
+  var accountSize=parseInt(r.size.replace('K',''))*1000;
+  var initialFloor=accountSize-r.evalDrawdown;
+  var frozenThreshold=accountSize+100;
+  var peakBalance=accountSize;
+  var sortedTrades=trades.slice().sort(function(a,b){return(a.date||'').localeCompare(b.date||'');});
+  sortedTrades.forEach(function(t){peakBalance=Math.max(peakBalance,accountSize+(t.pnl||0));});
+  var currentBalance=accountSize+totalPnl;
+  var rawFloor=peakBalance-r.evalDrawdown;
+  var trailFloor=Math.min(rawFloor,frozenThreshold);
+  var trailFrozen=trailFloor>=frozenThreshold;
+  var trailPct=Math.min(100,Math.max(0,((trailFloor-initialFloor)/(frozenThreshold-initialFloor))*100));
+  var marginLeft=currentBalance-trailFloor;
+  var marginPct=Math.min(100,Math.max(0,(marginLeft/r.evalDrawdown)*100));
+
+  el.innerHTML=
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">'+
+      '<div style="width:10px;height:10px;background:'+r.color+';border-radius:50%"></div>'+
+      '<h2 style="font-size:18px;font-weight:700;color:var(--text)">APEX '+r.size+' — Règles & Progression</h2>'+
+    '</div>'+
+
+    // EVALUATION
+    '<div class="card" style="margin-bottom:14px">'+
+      '<div class="card-title" style="color:'+r.color+'">🎯 ÉVALUATION</div>'+
+      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">'+
+        apexStat('Objectif profit','$'+r.evalTarget.toLocaleString(),'var(--green)')+
+        apexStat('Drawdown max','$'+r.evalDrawdown.toLocaleString(),'var(--red)')+
+        apexStat('Daily Loss Limit','$'+r.dailyLoss.toLocaleString(),'#f59e0b')+
+        apexStat('Contrats max',r.contracts,'var(--blue)')+
+      '</div>'+
+      '<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text2);margin-bottom:4px"><span>Progression vers objectif</span><span style="color:'+(totalPnl>=0?'var(--green)':'var(--red)')+'">$'+totalPnl.toFixed(0)+' / $'+r.evalTarget+'</span></div>'+
+        '<div style="background:var(--bg3);border-radius:4px;height:8px"><div style="background:'+(totalPnl>=r.evalTarget?'var(--green)':r.color)+';height:8px;border-radius:4px;width:'+pct+'%;transition:.3s"></div></div>'+
+      '</div>'+
+      '<div><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text2);margin-bottom:4px"><span>Drawdown utilisé</span><span style="color:'+(ddPct>70?'var(--red)':'var(--text2)')+'">'+ddPct.toFixed(0)+'%</span></div>'+
+        '<div style="background:var(--bg3);border-radius:4px;height:8px"><div style="background:'+(ddPct>70?'var(--red)':'#f59e0b')+';height:8px;border-radius:4px;width:'+ddPct+'%;transition:.3s"></div></div>'+
+      '</div>'+
+      (totalPnl>=r.evalTarget?'<div style="margin-top:14px;background:rgba(6,214,160,.1);border:1px solid var(--green);border-radius:8px;padding:10px;text-align:center;color:var(--green);font-weight:600">✅ OBJECTIF ATTEINT — Évaluation réussie !</div>':'')+
+    '</div>'+
+
+    // TRAILING DRAWDOWN
+    '<div class="card" style="margin-bottom:14px">'+
+      '<div class="card-title" style="color:#f59e0b">⚠️ TRAILING DRAWDOWN — '+r.size+'</div>'+
+      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">'+
+        apexStat('Balance actuelle','$'+currentBalance.toLocaleString(),'var(--text)')+
+        apexStat('Floor actuel','$'+Math.round(trailFloor).toLocaleString(),marginLeft<r.evalDrawdown*0.3?'var(--red)':'#f59e0b')+
+        apexStat('Marge restante','$'+Math.round(marginLeft).toLocaleString(),marginLeft<r.evalDrawdown*0.3?'var(--red)':marginLeft<r.evalDrawdown*0.6?'#f59e0b':'var(--green)')+
+        apexStat('Statut trail',trailFrozen?'🔒 Figé':'📈 Actif',trailFrozen?'var(--green)':'#f59e0b')+
+      '</div>'+
+      '<div style="margin-bottom:12px">'+
+        '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text2);margin-bottom:4px">'+
+          '<span>Progression du floor ($'+Math.round(initialFloor).toLocaleString()+' → $'+frozenThreshold.toLocaleString()+')</span>'+
+          '<span style="color:#f59e0b">'+trailPct.toFixed(0)+'%</span>'+
+        '</div>'+
+        '<div style="background:var(--bg3);border-radius:4px;height:10px;position:relative">'+
+          '<div style="background:linear-gradient(90deg,#f59e0b,var(--green));height:10px;border-radius:4px;width:'+trailPct+'%;transition:.3s"></div>'+
+        '</div>'+
+        '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-top:4px">'+
+          '<span>Floor initial: $'+Math.round(initialFloor).toLocaleString()+'</span>'+
+          '<span>'+(trailFrozen?'🔒 Floor figé à $'+frozenThreshold.toLocaleString()+' (sécurisé !)':'Floor figé à: $'+frozenThreshold.toLocaleString())+'</span>'+
+        '</div>'+
+      '</div>'+
+      '<div>'+
+        '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text2);margin-bottom:4px">'+
+          '<span>Marge de sécurité restante</span>'+
+          '<span style="color:'+(marginLeft<r.evalDrawdown*0.3?'var(--red)':marginLeft<r.evalDrawdown*0.6?'#f59e0b':'var(--green)')+'">$'+Math.round(marginLeft).toLocaleString()+' / $'+r.evalDrawdown.toLocaleString()+'</span>'+
+        '</div>'+
+        '<div style="background:var(--bg3);border-radius:4px;height:10px">'+
+          '<div style="background:'+(marginLeft<r.evalDrawdown*0.3?'var(--red)':marginLeft<r.evalDrawdown*0.6?'#f59e0b':'var(--green)')+';height:10px;border-radius:4px;width:'+marginPct+'%;transition:.3s"></div>'+
+        '</div>'+
+      '</div>'+
+    '</div>'+
+
+    // PERFORMANCE ACCOUNT
+    '<div class="card" style="margin-bottom:14px">'+
+      '<div class="card-title" style="color:'+r.color+'">💰 PERFORMANCE ACCOUNT (PA)</div>'+
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">'+
+        apexStat('Jours qualifiants','5 min','var(--blue)')+
+        apexStat('Profit min/jour','$'+r.paDailyMin,'var(--green)')+
+        apexStat('Consistency','<'+r.paConsistency+'%',consistencyOk?'var(--green)':'var(--red)')+
+      '</div>'+
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">'+
+        apexStat('Safety Net','$'+r.paSafetyNet.toLocaleString(),'#f59e0b')+
+        apexStat('Payout max','$'+r.paMaxPayout.toLocaleString(),'var(--green)')+
+        apexStat('Payouts max',r.paPayouts+' total','var(--text2)')+
+      '</div>'+
+    '</div>'+
+
+    // PROGRESSION PA
+    '<div class="card">'+
+      '<div class="card-title" style="color:'+r.color+'">📊 PROGRESSION PAYOUT</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">'+
+        '<div>'+
+          '<div style="font-size:11px;color:var(--text2);margin-bottom:8px">Jours qualifiants (≥$'+r.paDailyMin+')</div>'+
+          '<div style="display:flex;gap:6px">'+
+          [1,2,3,4,5].map(function(i){
+            return '<div style="width:36px;height:36px;border-radius:8px;border:2px solid '+(qualDays>=i?'var(--green)':'var(--border)')+';background:'+(qualDays>=i?'rgba(6,214,160,.15)':'var(--bg3)')+';display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:'+(qualDays>=i?'var(--green)':'var(--text3)')+'">'+i+'</div>';
+          }).join('')+
+          '</div>'+
+          '<div style="margin-top:8px;font-size:11px;color:'+(qualDays>=5?'var(--green)':'var(--text3)')+'">'+qualDays+'/5 jours '+(qualDays>=5?'✅ Payout disponible !':'complétés')+' </div>'+
+        '</div>'+
+        '<div>'+
+          '<div style="font-size:11px;color:var(--text2);margin-bottom:8px">Consistency Rule (meilleur jour)</div>'+
+          '<div style="font-size:24px;font-weight:700;color:'+(consistencyOk?'var(--green)':'var(--red)')+'">'+
+            (totalPnl>0?((bestDay/totalPnl)*100).toFixed(0):0)+'%'+
+          '</div>'+
+          '<div style="font-size:11px;color:var(--text3);margin-top:4px">Max autorisé: '+r.paConsistency+'% — Meilleur jour: $'+bestDay.toFixed(0)+'</div>'+
+          '<div style="margin-top:6px;font-size:11px;color:'+(consistencyOk?'var(--green)':'var(--red)')+'">'+
+            (consistencyOk?'✅ Consistency OK':'❌ Jour trop dominant — attendre')+
+          '</div>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+}
+
+function apexStat(label,val,color){
+  return '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px">'+
+    '<div style="font-size:10px;color:var(--text3);margin-bottom:4px;text-transform:uppercase">'+label+'</div>'+
+    '<div style="font-size:18px;font-weight:700;color:'+color+'">'+val+'</div>'+
+  '</div>';
+}
+
+function updateApexNav(){
+  var nav=document.getElementById('nav-apex');
+  if(!nav)return;
+  var isApex=currentAccount.startsWith('apex');
+  nav.style.display=isApex?'flex':'none';
+}
+
 function renderAccountSelect(){var sel=document.getElementById('account-select');if(!sel)return;sel.innerHTML='';userAccounts.forEach(function(a){var o=document.createElement('option');o.value=a.id;o.textContent=a.icon+' '+a.label;sel.appendChild(o);});sel.value=currentAccount;}
 function switchAccount(acc){currentAccount=acc;localStorage.setItem('tj_account',acc);trades=[];renderDashboard();loadTrades();}
 function addAccount(){document.getElementById('add-account-modal').style.display='flex';setTimeout(function(){document.getElementById('add-account-input').focus();},100);}function confirmAddAccount(){var name=document.getElementById('add-account-input').value.trim();if(!name)return;var id='acc_'+Date.now();var icon=name.toLowerCase().includes('perso')?'💼':'🏆';userAccounts.push({id:id,label:name,icon:icon});saveAccounts();renderAccountSelect();switchAccount(id);document.getElementById('add-account-modal').style.display='none';document.getElementById('add-account-input').value='';}
@@ -974,7 +1149,7 @@ function parseCSV(file){hideAlerts();var r=new FileReader();r.onload=function(e)
 function parseCSVAdd(file){hideAlerts();var r=new FileReader();r.onload=function(e){var text=e.target.result;var lines=text.split(String.fromCharCode(10)).map(function(l){return l.trim();}).filter(function(l){return l;});if(lines.length<2){showErr('Fichier vide.');return;}var sep=lines[0].includes(';')?';':',';var trades=parseNTReportLines(lines,sep);if(!trades.length){showErr('Aucun trade trouvé.');return;}bulkInsert(trades,function(n){showSuccess(n+' trades ajoutés !');loadTrades();});};r.readAsText(file,'windows-1252');}
 function parseExcelFile(file,callback){var reader=new FileReader();reader.onload=function(e){try{var data=new Uint8Array(e.target.result);var wb=XLSX.read(data,{type:'array'});var ws=wb.Sheets[wb.SheetNames[0]];var rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});callback(rows);}catch(err){showErr('Erreur Excel: '+err.message);}};reader.readAsArrayBuffer(file);}
 function parseNTExcel(rows){function pp(v){if(typeof v==='number')return v;return parseFloat((v||'0').toString().replace(/[^0-9,.-]/g,'').replace(',','.'))||0;}function ph(v){if(!v)return{date:'',time:''};if(typeof v==='number'){var d=new Date(Math.round((v-25569)*86400*1000));return{date:d.getUTCFullYear()+'-'+('0'+(d.getUTCMonth()+1)).slice(-2)+'-'+('0'+d.getUTCDate()).slice(-2),time:('0'+d.getUTCHours()).slice(-2)+':'+('0'+d.getUTCMinutes()).slice(-2)};}var s=v.toString();var pts=s.split(' ');var ds='';if(pts[0]){var dp=pts[0].split('/');if(dp.length===3)ds=dp[2]+'-'+dp[1].padStart(2,'0')+'-'+dp[0].padStart(2,'0');else ds=pts[0];}return{date:ds,time:pts[1]||''};}var trades=[];for(var i=1;i<rows.length;i++){var row=rows[i];if(!row||!row[1])continue;var profit=pp(row[12]);var ep=pp(row[6]);var xp=pp(row[7]);var dt=ph(row[8]);var dir=(row[4]||'').toString().toLowerCase();var side=dir.includes('long')||dir.includes('buy')?'BUY':'SELL';var instr=(row[1]||'').toString().replace(/ d{2}-d{2}/,'').trim();var symbol=instr.includes('MNQ')?'NAS100':instr.includes('MGC')?'GOLD':instr;var hr=dt.time?parseInt(dt.time.split(':')[0]):12;var session=hr>=8&&hr<10?'Europe':hr>=15&&hr<18?'US':'Autre';trades.push({date:dt.date,symbol:symbol,side:side,lots:(parseInt(row[5])||1)/100,entry:ep,exit:xp,pnl:profit,netPnl:profit,status:'closed',session:session,emotion:'Neutre',error:'',entryTime:dt.time,tp2:dt.time,account:currentAccount});}if(!trades.length){showErr('Aucun trade trouvé dans Excel.');return;}bulkInsert(trades,function(n){showSuccess(n+' trades importés depuis Excel !');loadTrades();});}
-document.addEventListener('DOMContentLoaded',function(){var savedBal=localStorage.getItem('tj_balance');if(savedBal){var bs=document.getElementById('balance-start');if(bs)bs.textContent=String.fromCharCode(36)+(parseFloat(savedBal)||0).toFixed(2);}var isLocal=window.location.protocol==='file:';if(isLocal){hideLogin();trades=[];renderDashboard();}else if(!authToken){showLogin();}else{hideLogin();loadTrades();}});
+document.addEventListener('DOMContentLoaded',function(){var savedBal=localStorage.getItem('tj_balance');if(savedBal){var bs=document.getElementById('balance-start');if(bs)bs.textContent=String.fromCharCode(36)+(parseFloat(savedBal)||0).toFixed(2);}var isLocal=window.location.protocol==='file:';updateApexNav();if(isLocal){hideLogin();trades=[];renderDashboard();renderApexDashboard();}else if(!authToken){showLogin();}else{hideLogin();renderApexDashboard();loadTrades();}});
 
 </script>
 
