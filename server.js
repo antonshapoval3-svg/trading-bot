@@ -202,7 +202,7 @@ async function sendMorningBriefing(force) {
 ═══════════════════════
 [2 phrases]
 
-💪 Anton Trading Bot`;
+`;
 
     const res = await axios.post("https://api.anthropic.com/v1/messages", {
       model: "claude-sonnet-4-6", max_tokens: 2048,
@@ -213,67 +213,61 @@ async function sendMorningBriefing(force) {
     const txt = extractText(res.data.content);
     if (!txt || txt.length < 20) { await sendTelegram("Erreur briefing: contenu vide"); return; }
 
-    // Envoyer le briefing marché
-    if (txt.length > 3800) {
-      let rem = txt;
-      while (rem.length > 0) {
-        let cut = rem.lastIndexOf("\n", 3800);
-        if (cut <= 0) cut = 3800;
-        await sendTelegram(rem.substring(0, cut));
-        rem = rem.substring(cut).trim();
-        await new Promise(r => setTimeout(r, 500));
-      }
-    } else {
-      await sendTelegram(txt);
-    }
-
-    // Générer et envoyer le concept du jour via Claude
-    await new Promise(r => setTimeout(r, 1500));
+    // Générer le concept du jour via Claude
+    let conceptTxt = "";
     try {
       const conceptPrompt = `Tu es un formateur en trading et finance. Aujourd'hui c'est le ${today}.
 
 Choisis UN concept financier ou économique utile pour un trader (pas le même qu'hier), et explique-le en français de façon claire et pratique.
 
-Exemples de sujets possibles (mais pas limité à ça) : inflation, taux d'intérêt, PIB, NFP, VIX, corrélations, fibonacci, RSI, MACD, bougies japonaises, order flow, carry trade, yield curve, QE, PMI, risk/reward, money management, psychologie du trading, sessions de marché, spread, levier, valeur refuge, devises, pétrole, or, obligations, banques centrales, politique monétaire, sentiment de marché, volumes, supports/résistances, figures chartistes, etc.
+Exemples de sujets : inflation, taux d'intérêt, PIB, NFP, VIX, corrélations, fibonacci, RSI, MACD, bougies japonaises, order flow, carry trade, yield curve, QE, PMI, risk/reward, money management, psychologie du trading, sessions de marché, spread, levier, or, obligations, banques centrales, volumes, supports/résistances, etc.
 
 Si une annonce économique importante sort aujourd'hui, explique ce concept en priorité.
 
-Réponds UNIQUEMENT avec le message Telegram, format exact :
+Réponds UNIQUEMENT avec ce bloc, sans introduction :
 
-📚 CONCEPT DU JOUR — [NOM DU CONCEPT EN MAJUSCULES]
+📚 CONCEPT DU JOUR — [NOM EN MAJUSCULES]
 
-[Explication simple en 2-3 phrases accessibles à un débutant]
+[Explication simple en 2-3 phrases]
 
 🔑 Points clés :
 • [point 1]
 • [point 2]
 • [point 3]
 
-📈 Impact sur le trading :
-• [impact concret 1]
-• [impact concret 2]
+📈 Impact trading :
+• [impact 1]
+• [impact 2]
 
-💡 Retiens : "[phrase mémorable courte]"`;
+💡 Retiens : "[phrase mémorable]"`;
 
       const conceptRes = await axios.post("https://api.anthropic.com/v1/messages", {
-        model: "claude-sonnet-4-6", max_tokens: 800,
+        model: "claude-sonnet-4-6", max_tokens: 600,
         messages: [{ role: "user", content: conceptPrompt }]
       }, { headers: { "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" } });
 
-      const conceptTxt = conceptRes.data.content
+      conceptTxt = conceptRes.data.content
         .filter(b => b.type === "text")
         .map(b => b.text.trim())
         .join("\n")
         .trim();
-
-      if (conceptTxt && conceptTxt.length > 20) {
-        await sendTelegram(conceptTxt);
-      }
     } catch(ce) {
       console.error("Erreur concept:", ce.message);
     }
 
-    console.log("Briefing + concept envoyes !");
+    // Fusionner briefing + concept en un seul message
+    const separator = "\n\n━━━━━━━━━━━━━━━━━━━━━━\n\n";
+    const fullMessage = txt + (conceptTxt ? separator + conceptTxt : "") ;
+
+    if (fullMessage.length > 4000) {
+      // Telegram limite à 4096 chars — envoyer en 2 si trop long
+      await sendTelegram(txt );
+      if (conceptTxt) await sendTelegram(conceptTxt);
+    } else {
+      await sendTelegram(fullMessage);
+    }
+
+    console.log("Briefing envoye !");
   } catch (e) { await sendTelegram("Erreur briefing: " + e.message); }
 }
 
