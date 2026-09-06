@@ -156,10 +156,10 @@ app.delete("/api/trades/:id", auth, async (req, res) => {
 });
 
 // ── BRIEFING ──
-async function sendMorningBriefing() {
+async function sendMorningBriefing(force) {
   const now = new Date();
   const day = now.getDay();
-  if (day === 0 || day === 6) { console.log("Week-end — pas de briefing."); return; }
+  if (!force && (day === 0 || day === 6)) { console.log("Week-end — pas de briefing."); return; }
   const today = new Date().toLocaleDateString("fr-FR", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
   console.log("Briefing du " + today + "...");
   try {
@@ -287,7 +287,7 @@ function scheduleBriefing() {
 }
 
 // ── ROUTES ──
-app.get("/briefing/test", (req, res) => { res.json({ message: "Briefing en cours..." }); sendMorningBriefing(); });
+app.get("/briefing/test", (req, res) => { res.json({ message: "Briefing en cours..." }); sendMorningBriefing(true); });
 app.get("/health", async (req, res) => {
   const count = col("trades") ? await col("trades").countDocuments() : 0;
   const users = col("users") ? await col("users").countDocuments() : 0;
