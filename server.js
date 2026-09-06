@@ -104,7 +104,9 @@ app.post("/auth/login", async (req, res) => {
 // ── TRADES ──
 app.get("/api/trades", auth, async (req, res) => {
   try {
-    const trades = await col("trades").find({ userId: req.userId }).sort({ createdAt: -1 }).toArray();
+    const query = { userId: req.userId };
+    if (req.query.account) query.account = req.query.account;
+    const trades = await col("trades").find(query).sort({ createdAt: -1 }).toArray();
     res.json(trades.map(t => ({ ...t, id: t._id.toString() })));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -138,15 +140,15 @@ app.put("/api/trades/:id", auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// BULK DELETE all trades for user
+// DELETE par account ou tous
 app.delete("/api/trades", auth, async (req, res) => {
   try {
-    const result = await db.collection("trades").deleteMany({ userId: req.userId });
+    const query = { userId: req.userId };
+    if (req.query.account) query.account = req.query.account;
+    const result = await db.collection("trades").deleteMany(query);
     res.json({ deleted: result.deletedCount });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
-
-
 
 app.delete("/api/trades/:id", auth, async (req, res) => {
   try {
@@ -157,17 +159,13 @@ app.delete("/api/trades/:id", auth, async (req, res) => {
 
 // ── BRIEFING ──
 async function sendMorningBriefing() {
-  // Pas d'envoi le week-end (samedi=6, dimanche=0)
   const now = new Date();
   const day = now.getDay();
-  if (day === 0 || day === 6) {
-    console.log("Week-end — pas de briefing aujourd'hui.");
-    return;
-  }
+  if (day === 0 || day === 6) { console.log("Week-end — pas de briefing."); return; }
   const today = new Date().toLocaleDateString("fr-FR", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
   console.log("Briefing du " + today + "...");
   try {
-    const prompt = "Recherche le prix du GOLD et DAX et le calendrier economique du " + today + ". Reponds en francais. Commence DIRECTEMENT par le briefing sans introduction. Format:\n\n📊 BRIEFING " + today.toUpperCase() + "\n\n━━━━━━━━━━━━━━━━━\n🥇 GOLD (XAU/USD)\n━━━━━━━━━━━━━━━━━\n💰 Prix : [prix reel]\n📈 Tendance : [HAUSSIER/BAISSIER/NEUTRE]\n🛡 Support : [niveau] | 🎯 Resistance : [niveau]\n⚡ Signal : [LONG/SHORT/NEUTRE]\n\n━━━━━━━━━━━━━━━━━\n🇩🇪 DAX (GER40)\n━━━━━━━━━━━━━━━━━\n💰 Prix : [prix reel]\n📈 Tendance : [HAUSSIER/BAISSIER/NEUTRE]\n🛡 Support : [niveau] | 🎯 Resistance : [niveau]\n⚡ Signal : [LONG/SHORT/NEUTRE]\n\n━━━━━━━━━━━━━━━━━\n📅 ANNONCES DU JOUR\n━━━━━━━━━━━━━━━━━\n[chaque annonce: 🔴/🟠/🟡 heure nom]\n⚡ Court terme : [impact]\n📆 Long terme : [impact]\n\n━━━━━━━━━━━━━━━━━\n📰 NEWS CLES\n━━━━━━━━━━━━━━━━━\n• [news 1]\n• [news 2]\n• [news 3]\n\n━━━━━━━━━━━━━━━━━\n🧠 STRATEGIE DU JOUR\n━━━━━━━━━━━━━━━━━\n[2 phrases]\n\n🤖 Anton Trading Bot";
+    const prompt = "Recherche le prix du GOLD et DAX et le calendrier economique du " + today + ". Reponds en francais. Commence DIRECTEMENT par le briefing sans introduction.";
     const res = await axios.post("https://api.anthropic.com/v1/messages", {
       model: "claude-sonnet-4-6", max_tokens: 2048,
       tools: [{ type: "web_search_20250305", name: "web_search" }],
@@ -211,4 +209,4 @@ app.listen(PORT, async () => {
   console.log("Serveur port " + PORT);
   await connectMongo();
   scheduleBriefing();
-}); 
+});
