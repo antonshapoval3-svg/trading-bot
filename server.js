@@ -111,7 +111,6 @@ app.get("/api/trades", auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// BULK INSERT trades
 app.post("/api/trades/bulk", auth, async (req, res) => {
   try {
     const trades = req.body;
@@ -140,7 +139,6 @@ app.put("/api/trades/:id", auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// DELETE par account ou tous
 app.delete("/api/trades", auth, async (req, res) => {
   try {
     const query = { userId: req.userId };
@@ -165,14 +163,57 @@ async function sendMorningBriefing() {
   const today = new Date().toLocaleDateString("fr-FR", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
   console.log("Briefing du " + today + "...");
   try {
-    const prompt = "Recherche le prix du GOLD et DAX et le calendrier economique du " + today + ". Reponds en francais. Commence DIRECTEMENT par le briefing sans introduction.";
+    const prompt = `Recherche le prix du GOLD et DAX et le calendrier economique du ${today}. Reponds en francais. Commence DIRECTEMENT par le briefing sans introduction. Format exact:
+
+📅 BRIEFING ${today.toUpperCase()}
+
+═══════════════════════
+🥇 GOLD (XAU/USD)
+═══════════════════════
+💲 Prix : [prix reel]
+📊 Tendance : [HAUSSIER/BAISSIER/NEUTRE]
+🏔 Support : [niveau] | 🎯 Resistance : [niveau]
+⚡ Signal : [LONG/SHORT/NEUTRE]
+
+═══════════════════════
+🇩🇪 DAX (GER40)
+═══════════════════════
+💲 Prix : [prix reel]
+📊 Tendance : [HAUSSIER/BAISSIER/NEUTRE]
+🏔 Support : [niveau] | 🎯 Resistance : [niveau]
+⚡ Signal : [LONG/SHORT/NEUTRE]
+
+═══════════════════════
+📰 ANNONCES DU JOUR
+═══════════════════════
+[chaque annonce: 🔴/🟡/🟢 heure nom]
+⚡ Court terme : [impact]
+📈 Long terme : [impact]
+
+═══════════════════════
+📰 NEWS CLES
+═══════════════════════
+• [news 1]
+• [news 2]
+• [news 3]
+
+═══════════════════════
+🎯 STRATEGIE DU JOUR
+═══════════════════════
+[2 phrases]
+
+💪 Anton Trading Bot`;
+
     const res = await axios.post("https://api.anthropic.com/v1/messages", {
       model: "claude-sonnet-4-6", max_tokens: 2048,
       tools: [{ type: "web_search_20250305", name: "web_search" }],
       messages: [{ role: "user", content: prompt }]
     }, { headers: { "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" } });
+
     const txt = extractText(res.data.content);
     if (!txt || txt.length < 20) { await sendTelegram("Erreur briefing: contenu vide"); return; }
+
+    // Envoyer le briefing marché
     if (txt.length > 3800) {
       let rem = txt;
       while (rem.length > 0) {
@@ -182,8 +223,57 @@ async function sendMorningBriefing() {
         rem = rem.substring(cut).trim();
         await new Promise(r => setTimeout(r, 500));
       }
-    } else { await sendTelegram(txt); }
-    console.log("Briefing envoye !");
+    } else {
+      await sendTelegram(txt);
+    }
+
+    // Générer et envoyer le concept du jour via Claude
+    await new Promise(r => setTimeout(r, 1500));
+    try {
+      const conceptPrompt = `Tu es un formateur en trading et finance. Aujourd'hui c'est le ${today}.
+
+Choisis UN concept financier ou économique utile pour un trader (pas le même qu'hier), et explique-le en français de façon claire et pratique.
+
+Exemples de sujets possibles (mais pas limité à ça) : inflation, taux d'intérêt, PIB, NFP, VIX, corrélations, fibonacci, RSI, MACD, bougies japonaises, order flow, carry trade, yield curve, QE, PMI, risk/reward, money management, psychologie du trading, sessions de marché, spread, levier, valeur refuge, devises, pétrole, or, obligations, banques centrales, politique monétaire, sentiment de marché, volumes, supports/résistances, figures chartistes, etc.
+
+Si une annonce économique importante sort aujourd'hui, explique ce concept en priorité.
+
+Réponds UNIQUEMENT avec le message Telegram, format exact :
+
+📚 CONCEPT DU JOUR — [NOM DU CONCEPT EN MAJUSCULES]
+
+[Explication simple en 2-3 phrases accessibles à un débutant]
+
+🔑 Points clés :
+• [point 1]
+• [point 2]
+• [point 3]
+
+📈 Impact sur le trading :
+• [impact concret 1]
+• [impact concret 2]
+
+💡 Retiens : "[phrase mémorable courte]"`;
+
+      const conceptRes = await axios.post("https://api.anthropic.com/v1/messages", {
+        model: "claude-sonnet-4-6", max_tokens: 800,
+        messages: [{ role: "user", content: conceptPrompt }]
+      }, { headers: { "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" } });
+
+      const conceptTxt = conceptRes.data.content
+        .filter(b => b.type === "text")
+        .map(b => b.text.trim())
+        .join("\n")
+        .trim();
+
+      if (conceptTxt && conceptTxt.length > 20) {
+        await sendTelegram(conceptTxt);
+      }
+    } catch(ce) {
+      console.error("Erreur concept:", ce.message);
+    }
+
+    console.log("Briefing + concept envoyes !");
   } catch (e) { await sendTelegram("Erreur briefing: " + e.message); }
 }
 
