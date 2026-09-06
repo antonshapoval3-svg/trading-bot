@@ -980,7 +980,15 @@ var APEX_RULES={
 };
 
 function renderApexDashboard(){
+  // Détecter les règles depuis l'ID ou le nom du compte
   var rules=APEX_RULES[currentAccount];
+  if(!rules){
+    var acc=userAccounts.find(function(a){return a.id===currentAccount;});
+    var label=acc?acc.label.toUpperCase():'';
+    if(label.indexOf('25K')>=0||label.indexOf('25 K')>=0)rules=APEX_RULES['apex25k'];
+    else if(label.indexOf('50K')>=0||label.indexOf('50 K')>=0)rules=APEX_RULES['apex50k'];
+    else if(label.indexOf('100K')>=0||label.indexOf('100 K')>=0)rules=APEX_RULES['apex100k'];
+  }
   var el=document.getElementById('apex-dashboard-content');
   if(!el)return;
   if(!rules){el.innerHTML='<div style="color:var(--text3);padding:40px;text-align:center">Sélectionne un compte APEX pour voir les règles.</div>';return;}
@@ -1122,6 +1130,11 @@ function updateApexNav(){
   var nav=document.getElementById('nav-apex');
   if(!nav)return;
   var isApex=currentAccount.startsWith('apex');
+  if(!isApex){
+    var acc=userAccounts.find(function(a){return a.id===currentAccount;});
+    var label=acc?acc.label.toUpperCase():'';
+    isApex=label.indexOf('APEX')>=0||label.indexOf('25K')>=0||label.indexOf('50K')>=0||label.indexOf('100K')>=0;
+  }
   nav.style.display=isApex?'flex':'none';
 }
 
