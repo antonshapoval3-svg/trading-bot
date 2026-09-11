@@ -2,6 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const axios = require("axios");
 const crypto = require("crypto");
+const fs = require("fs");
 const { MongoClient, ObjectId } = require("mongodb");
 
 const app = express();
@@ -13,8 +14,8 @@ const TG_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TG_CHAT = process.env.TELEGRAM_CHAT_ID;
 const MONGO_URI = process.env.MONGO_URI;
 const SECRET = process.env.JWT_SECRET || "anton_trading_secret_2026";
+const CONCEPTS_FILE = "./concepts_history.json";
 
-// MongoDB
 let db;
 async function connectMongo() {
   try {
@@ -27,7 +28,6 @@ async function connectMongo() {
 }
 const col = (name) => db ? db.collection(name) : null;
 
-// Auth helpers
 const hash = (pwd) => crypto.createHmac("sha256", SECRET).update(pwd).digest("hex");
 const makeToken = (id, email) => {
   const p = JSON.stringify({ id, email, ts: Date.now() });
@@ -50,7 +50,6 @@ const auth = (req, res, next) => {
   next();
 };
 
-// Telegram
 async function sendTelegram(text) {
   if (!text || !text.trim()) return;
   try {
@@ -62,7 +61,6 @@ async function sendTelegram(text) {
   } catch (e) { console.error("Telegram:", e.message); }
 }
 
-// Extract Claude text
 function extractText(data) {
   if (!Array.isArray(data)) return "";
   return data
@@ -76,27 +74,29 @@ function extractText(data) {
     .trim();
 }
 
-// ── MEMOIRE CONCEPTS ──────────────────────────────────────────────────────────
-// Sauvegarde le concept du jour dans MongoDB
-async function saveConceptUsed(concept, date) {
+// ── MEMOIRE CONCEPTS FICHIER LOCAL ────────────────────────────────────────────
+function saveConceptUsed(concept, date) {
   try {
-    await col("concepts").insertOne({ concept, date, createdAt: new Date() });
+    let history = [];
+    if (fs.existsSync(CONCEPTS_FILE)) {
+      history = JSON.parse(fs.readFileSync(CONCEPTS_FILE, "utf8"));
+    }
+    history.unshift({ concept, date, createdAt: new Date() });
+    if (history.length > 30) history = history.slice(0, 30);
+    fs.writeFileSync(CONCEPTS_FILE, JSON.stringify(history, null, 2));
+    console.log("Concept sauvegarde : " + concept);
   } catch (e) { console.error("Erreur save concept:", e.message); }
 }
 
-// Recupere les X derniers concepts utilises
-async function getLastConcepts(limit = 15) {
+function getLastConcepts(limit = 20) {
   try {
-    const docs = await col("concepts")
-      .find({})
-      .sort({ createdAt: -1 })
-      .limit(limit)
-      .toArray();
-    return docs.map(d => d.concept);
+    if (!fs.existsSync(CONCEPTS_FILE)) return [];
+    const history = JSON.parse(fs.readFileSync(CONCEPTS_FILE, "utf8"));
+    return history.slice(0, limit).map(d => d.concept);
   } catch (e) { return []; }
 }
 
-// AUTH
+// ── AUTH ──────────────────────────────────────────────────────────────────────
 app.post("/auth/register", async (req, res) => {
   try {
     const { nom, email, password } = req.body;
@@ -125,7 +125,7 @@ app.post("/auth/login", async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// TRADES
+// ── TRADES ────────────────────────────────────────────────────────────────────
 app.get("/api/trades", auth, async (req, res) => {
   try {
     const query = { userId: req.userId };
@@ -182,7 +182,7 @@ app.delete("/api/trades/:id", auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ACCOUNTS
+// ── ACCOUNTS ──────────────────────────────────────────────────────────────────
 app.get("/api/accounts", auth, async (req, res) => {
   try {
     const accounts = await col("accounts").find({ userId: req.userId }).toArray();
@@ -198,7 +198,7 @@ app.post("/api/accounts", auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// BRIEFING
+// ── BRIEFING ──────────────────────────────────────────────────────────────────
 async function sendMorningBriefing(force) {
   const now = new Date();
   const day = now.getDay();
@@ -212,7 +212,7 @@ async function sendMorningBriefing(force) {
   console.log("Briefing du " + today + "...");
 
   try {
-    // ── 1. BRIEFING MARCHE ────────────────────────────────────────────────────
+    // 1. BRIEFING MARCHE
     const prompt = `Recherche le prix du GOLD et DAX et le calendrier economique du ${today}. Reponds en francais. Commence DIRECTEMENT par le briefing sans introduction. Format exact:
 
 📅 BRIEFING ${today.toUpperCase()}
@@ -259,29 +259,26 @@ async function sendMorningBriefing(force) {
     }, { headers: { "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" } });
 
     const txt = extractText(res.data.content);
-
-    // ✅ Verifie que le briefing est complet avant d'envoyer
     if (!txt || txt.length < 100) {
-      await sendTelegram("⚠️ Erreur briefing: contenu insuffisant");
+      await sendTelegram("Erreur briefing: contenu insuffisant");
       return;
     }
 
-    // ── 2. CONCEPT DU JOUR AVEC MEMOIRE ──────────────────────────────────────
-    // Recupere les 15 derniers concepts utilises pour eviter les doublons
-    const lastConcepts = await getLastConcepts(15);
+    // 2. CONCEPT DU JOUR AVEC MEMOIRE FICHIER
+    const lastConcepts = getLastConcepts(20);
     const exclusionList = lastConcepts.length > 0
-      ? `\n\nCONCEPTS DEJA UTILISES RECEMMENT (NE PAS REPETER) :\n${lastConcepts.map((c, i) => `${i + 1}. ${c}`).join("\n")}`
+      ? "\n\nCONCEPTS DEJA UTILISES — NE PAS REPETER :\n" + lastConcepts.map((c, i) => (i + 1) + ". " + c).join("\n")
       : "";
 
     const conceptPrompt = `Tu es un formateur en trading et finance. Aujourd'hui c'est le ${today}.
 
-Choisis UN concept financier ou economique DIFFERENT de ceux deja utilises, et explique-le en francais de facon claire et pratique.${exclusionList}
+Choisis UN concept DIFFERENT de ceux deja utilises et explique-le en francais.${exclusionList}
 
-Liste de sujets possibles : inflation, taux d'interet, PIB, NFP, VIX, correlations, fibonacci, RSI, MACD, bougies japonaises, order flow, carry trade, yield curve, QE, risk/reward, money management, psychologie du trading, sessions de marche, spread, levier, or, obligations, banques centrales, volumes, supports/resistances, ichimoku, bollinger, stochastique, ATR, marche a terme, options, swap, delta, gamma, liquidite, market maker, smart money, imbalance, FVG, order block, breaker block, BOS, CHoCH, scalping, swing trading, position trading, news trading, saisonnalite, COT report, intermarkets, etc.
+Sujets possibles : inflation, taux d'interet, PIB, NFP, VIX, correlations, fibonacci, RSI, MACD, bougies japonaises, order flow, carry trade, yield curve, QE, risk/reward, money management, psychologie du trading, sessions de marche, spread, levier, or, obligations, banques centrales, volumes, supports/resistances, ichimoku, bollinger, stochastique, ATR, options, swap, liquidite, market maker, smart money, imbalance, FVG, order block, BOS, CHoCH, scalping, swing trading, COT report, intermarkets, saisonnalite, delta, gamma, PMI, CPI, PPI, NFP, FOMC, BCE, Fed, dollar index, carry trade, corrélations or/dollar, etc.
 
-Si une annonce economique importante sort aujourd'hui, explique ce concept en priorite.
+Si une annonce importante sort aujourd'hui, explique ce concept en priorite.
 
-Reponds UNIQUEMENT avec ce format, sans introduction :
+Reponds UNIQUEMENT avec ce format :
 
 📚 CONCEPT DU JOUR — [NOM EN MAJUSCULES]
 
@@ -313,41 +310,35 @@ Reponds UNIQUEMENT avec ce format, sans introduction :
         .join("\n")
         .trim();
 
-      // ✅ Extrait le nom du concept pour le sauvegarder en memoire
       const match = conceptTxt.match(/CONCEPT DU JOUR\s*[—-]\s*(.+)/i);
       if (match) {
         conceptName = match[1].trim();
-        await saveConceptUsed(conceptName, today);
+        saveConceptUsed(conceptName, today);
         console.log("Concept du jour : " + conceptName);
       }
 
     } catch (ce) {
       console.error("Erreur concept:", ce.message);
-      conceptTxt = "";
     }
 
-    // ── 3. ENVOI ──────────────────────────────────────────────────────────────
-    // ✅ Envoie briefing + concept en messages separes pour s'assurer que les deux arrivent
+    // 3. ENVOI SEPARE
     await sendTelegram(txt);
 
     if (conceptTxt && conceptTxt.length > 20) {
       await sendTelegram(conceptTxt);
-    } else {
-      console.log("⚠️ Concept vide — non envoye");
     }
 
     console.log("Briefing envoye !");
 
   } catch (e) {
     console.error("Erreur briefing:", e.message);
-    await sendTelegram("⚠️ Erreur briefing: " + e.message);
+    await sendTelegram("Erreur briefing: " + e.message);
   }
 }
 
 function scheduleBriefing() {
   const now = new Date();
   const next = new Date();
-  // ✅ Heure Paris (UTC+2 ete / UTC+1 hiver) — 08h30 heure de Paris = 06h30 UTC
   next.setUTCHours(6, 30, 0, 0);
   if (now >= next) next.setDate(next.getDate() + 1);
   const delay = next - now;
@@ -358,25 +349,28 @@ function scheduleBriefing() {
   }, delay);
 }
 
-// ROUTES
+// ── ROUTES ────────────────────────────────────────────────────────────────────
 app.get("/briefing/test", (req, res) => {
   res.json({ message: "Briefing en cours..." });
   sendMorningBriefing(true);
 });
 
+app.get("/concepts/history", (req, res) => {
+  try {
+    if (!fs.existsSync(CONCEPTS_FILE)) return res.json([]);
+    const history = JSON.parse(fs.readFileSync(CONCEPTS_FILE, "utf8"));
+    res.json(history);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get("/health", async (req, res) => {
   const count = col("trades") ? await col("trades").countDocuments() : 0;
   const users = col("users") ? await col("users").countDocuments() : 0;
-  const concepts = col("concepts") ? await col("concepts").countDocuments() : 0;
+  let concepts = 0;
+  if (fs.existsSync(CONCEPTS_FILE)) {
+    concepts = JSON.parse(fs.readFileSync(CONCEPTS_FILE, "utf8")).length;
+  }
   res.json({ status: "ok", trades: count, users, concepts, db: db ? "connecte" : "deconnecte" });
-});
-
-// ✅ Route pour voir les concepts utilises
-app.get("/concepts/history", async (req, res) => {
-  try {
-    const list = await col("concepts").find({}).sort({ createdAt: -1 }).limit(30).toArray();
-    res.json(list);
-  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 const PORT = process.env.PORT || 3000;
