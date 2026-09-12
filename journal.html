@@ -1035,7 +1035,6 @@ function renderApexDashboard(){
     '<div><div style="font-size:10px;color:var(--text2);margin-bottom:7px">Jours qualifiants (≥$'+r.paDailyMin+')</div><div style="display:flex;gap:5px">'+[1,2,3,4,5].map(function(i){return'<div style="width:34px;height:34px;border-radius:7px;border:2px solid '+(qualDays>=i?'var(--green)':'var(--border)')+';background:'+(qualDays>=i?'rgba(16,185,129,.1)':'var(--bg3)')+';display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:'+(qualDays>=i?'var(--green)':'var(--text3)')+'">'+i+'</div>';}).join('')+'</div><div style="margin-top:7px;font-size:10px;color:'+(qualDays>=5?'var(--green)':'var(--text3)')+'">'+qualDays+'/5 '+(qualDays>=5?'✅ Payout disponible !':'jours complétés')+'</div></div>'+
     '<div><div style="font-size:10px;color:var(--text2);margin-bottom:7px">Consistency Rule</div><div style="font-size:26px;font-weight:700;color:'+(consistencyOk?'var(--green)':'var(--red)')+'">'+( totalPnl>0?((bestDay/totalPnl)*100).toFixed(0):0)+'%</div><div style="font-size:9px;color:var(--text3);margin-top:3px">Max: '+r.paConsistency+'% — Meilleur jour: $'+bestDay.toFixed(0)+'</div><div style="margin-top:5px;font-size:10px;color:'+(consistencyOk?'var(--green)':'var(--red)')+'">'+( consistencyOk?'✅ OK':'❌ Jour trop dominant')+'</div></div>'+
     '</div></div>';
-}
   
 }
 
