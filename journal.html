@@ -1097,7 +1097,7 @@ function parseNTReportLines(lines,sep){
     if(heureStr){var pts=heureStr.split(' ');if(pts[0]){var dp=pts[0].split('/');if(dp.length===3)dateStr=dp[2]+'-'+dp[1].padStart(2,'0')+'-'+dp[0].padStart(2,'0');else dateStr=pts[0];}timeStr=pts[1]||'';}
     var dir=(cols[4]||'').toLowerCase();
     // ✅ FIX DIRECTION: short/sell détection correcte
-    var side=(dir.includes('short')||dir.includes('sell'))?'SELL':'BUY';
+    var side=(dir.includes('short')||dir.includes('sell')||dir.includes('court')||dir.includes('vente'))?'SELL':'BUY';
     var instr=(cols[1]||'').replace(/ \d{2}-\d{2}/,'').trim();
     var symbol=instr.includes('MNQ')||instr.includes('NQ')?'NAS100':instr.includes('MGC')||instr.includes('GC')?'GOLD':instr;
     raw.push({date:dateStr,symbol:symbol,side:side,qty:parseInt(cols[5])||1,entry:ep,exit:xp,pnl:profit,timeStr:timeStr});
@@ -1136,7 +1136,7 @@ function parseNTExcel(rows){
     var dt=ph(row[8]);
     var dir=(row[4]||'').toString().toLowerCase();
     // ✅ FIX DIRECTION
-    var side=(dir.includes('short')||dir.includes('sell'))?'SELL':'BUY';
+    var side=(dir.includes('short')||dir.includes('sell')||dir.includes('court')||dir.includes('vente'))?'SELL':'BUY';
     var instr=(row[1]||'').toString().replace(/ \d{2}-\d{2}/,'').trim();
     var symbol=instr.includes('MNQ')?'NAS100':instr.includes('MGC')?'GOLD':instr;
     var hr=dt.time?parseInt(dt.time.split(':')[0]):12;
