@@ -751,18 +751,18 @@ function renderTrades(){
 
   if(!list.length){tbody.innerHTML='<tr><td colspan="15" class="empty"><i class="ti ti-database-off" style="font-size:24px;display:block;margin-bottom:7px;opacity:.35"></i>Aucun trade</td></tr>';return;}
 
-  list=list.slice().sort(function(a,b){var da=(a.date||'').substring(0,10);var db=(b.date||'').substring(0,10);if(da===db){var pa
+  var rows=[],lastDate='';
   list.forEach(function(t){
     var tid=(t.id||t._id||'').toString();
     var isOpen=t.status==='open',isWin=t.pnl>0;
     var pnlColor=t.pnl>0?'var(--green)':t.pnl<0?'var(--red)':'var(--text3)';
 
-    var tdate=(t.date||'').substring(0,10);if(tdate&&tdate!==lastDate){
+    if(t.date&&t.date!==lastDate){
       var dayPnl=list.filter(function(x){return x.date===t.date;}).reduce(function(s,x){return s+(x.pnl||0);},0);
       var dc=dayPnl>0?'var(--green)':dayPnl<0?'var(--red)':'var(--text3)';
       var dd=t.date?t.date.split('-').reverse().join('/'):'';
       rows.push('<tr class="day-sep"><td colspan="15"><div style="display:flex;align-items:center;gap:10px"><div style="flex:1;height:1px;background:var(--border)"></div><span style="font-size:10px;font-weight:700;color:var(--text2);white-space:nowrap">📅 '+dd+'</span><div style="flex:1;height:1px;background:var(--border)"></div><span style="font-size:10px;font-weight:700;color:'+dc+'">'+(dayPnl>0?'+':'')+dayPnl.toFixed(2)+'$</span></div></td></tr>');
-      lastDate=tdate;
+      lastDate=t.date;
     }
 
     // ✅ FIX HEURE: utilise entryTime, tp2 comme fallback
