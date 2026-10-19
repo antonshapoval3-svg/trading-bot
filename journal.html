@@ -411,6 +411,8 @@ tr:hover td{background:var(--bg3)}
       <div class="field"><label>P&L ($)</label><input id="edit-pnl" type="number" step="any"></div>
       <div class="field"><label>Stratégie</label><select id="edit-strategy"><option>EMA + VWAP</option><option>OPR + Retest</option><option>TPO / POC</option><option>Confluence Multi-TF</option><option>Breakout</option><option>Support/Résistance</option><option>Zone Fibonacci</option><option>Rotation</option><option>Tendance</option><option>Autre</option></select></div>
       <div class="field"><label>Émotion</label><select id="edit-emotion"><option>Neutre</option><option>Confiant</option><option>Hésitant</option><option>FOMO</option><option>Stressé</option><option>Discipliné</option></select></div>
+      <div class="field"><label>Erreur commise</label><select id="edit-error"><option value="">Aucune ✅</option><option value="FOMO">FOMO</option><option value="Revenge">Revenge</option><option value="Overtrading">Overtrading</option><option value="SL déplacé">SL déplacé</option><option value="TP trop tôt">TP trop tôt</option><option value="Contre tendance">Contre tendance</option><option value="Mauvais timing">Mauvais timing</option><option value="Taille trop grande">Taille trop grande</option><option value="Pas de setup">Pas de setup</option><option value="Autre">Autre</option></select></div>
+      <div class="field"><label>Session</label><select id="edit-session"><option value="Europe">Europe</option><option value="US">US</option><option value="Autre">Autre</option></select></div>
     </div>
     <div class="field" style="margin-top:10px"><label>Notes</label><textarea id="edit-notes" style="min-height:60px"></textarea></div>
     <!-- PHOTOS EDIT -->
@@ -724,6 +726,8 @@ function openEditModal(id){
   document.getElementById('edit-pnl').value=t.pnl||'';
   document.getElementById('edit-strategy').value=t.strategy||'EMA + VWAP';
   document.getElementById('edit-emotion').value=t.emotion||'Neutre';
+  document.getElementById('edit-error').value=t.error||'';
+  document.getElementById('edit-session').value=t.session||'US';
   document.getElementById('edit-notes').value=t.notes||'';
   // Load existing photos
   editPhotoEntry = t.photo || null;
@@ -747,7 +751,7 @@ function confirmEdit(){
   var id=(document.getElementById('edit-id').value||'').toString();
   var idx=trades.findIndex(function(t){return (t.id||t._id||'').toString()===id.toString();});if(idx===-1)return;
   var pnl=parseFloat(document.getElementById('edit-pnl').value)||0;
-  trades[idx]=Object.assign({},trades[idx],{symbol:(document.getElementById('edit-symbol').value||'').toUpperCase().trim(),side:document.getElementById('edit-side').value,date:document.getElementById('edit-date').value,entry:parseFloat(document.getElementById('edit-entry').value)||0,sl:parseFloat(document.getElementById('edit-sl').value)||0,tp:parseFloat(document.getElementById('edit-tp').value)||0,tp2:parseFloat(document.getElementById('edit-tp2').value)||0,size:parseFloat(document.getElementById('edit-size').value)||1,status:document.getElementById('edit-status').value,pnl:pnl,netPnl:pnl,strategy:document.getElementById('edit-strategy').value,emotion:document.getElementById('edit-emotion').value,notes:document.getElementById('edit-notes').value});
+  trades[idx]=Object.assign({},trades[idx],{symbol:(document.getElementById('edit-symbol').value||'').toUpperCase().trim(),side:document.getElementById('edit-side').value,date:document.getElementById('edit-date').value,entry:parseFloat(document.getElementById('edit-entry').value)||0,sl:parseFloat(document.getElementById('edit-sl').value)||0,tp:parseFloat(document.getElementById('edit-tp').value)||0,tp2:parseFloat(document.getElementById('edit-tp2').value)||0,size:parseFloat(document.getElementById('edit-size').value)||1,status:document.getElementById('edit-status').value,pnl:pnl,netPnl:pnl,strategy:document.getElementById('edit-strategy').value,emotion:document.getElementById('edit-emotion').value,error:document.getElementById('edit-error').value,session:document.getElementById('edit-session').value,notes:document.getElementById('edit-notes').value});
   // Save photos — null = unchanged, '' = deleted, 'data:...' = new photo
   if(editPhotoEntry !== null) trades[idx].photo = editPhotoEntry || undefined;
   if(editPhotoExit !== null) trades[idx].photoExit = editPhotoExit || undefined;
