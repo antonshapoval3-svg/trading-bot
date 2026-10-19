@@ -344,7 +344,7 @@ tr:hover td{background:var(--bg3)}
           <div class="field"><label>Gain / Perte ($)</label><input id="f-pnl" type="number" placeholder="0.00" step="any"></div>
           <div class="field"><label>Stratégie</label><select id="f-strategy"><option>EMA + VWAP</option><option>OPR + Retest</option><option>TPO / POC</option><option>Confluence Multi-TF</option><option>Breakout</option><option>Support/Résistance</option><option>Zone Fibonacci</option><option>Rotation</option><option>Tendance</option><option>Autre</option></select></div>
           <div class="field"><label>Session</label><select id="f-session"><option value="US">🇺🇸 US (15h30-17h)</option><option value="Europe">🇪🇺 Europe (8h-9h30)</option></select></div>
-          <div class="field"><label>Erreur</label><select id="f-error"><option value="">Aucune ✅</option><option value="FOMO">FOMO</option><option value="Revenge">Revenge</option><option value="Overtrading">Overtrading</option><option value="SL déplacé">SL déplacé</option><option value="TP trop tôt">TP trop tôt</option></select></div>
+          <div class="field"><label>Erreur</label><select id="f-error" onchange="toggleCustomError('f-error-custom',this.value)"><option value="">Aucune ✅</option><option value="FOMO">FOMO</option><option value="Revenge">Revenge</option><option value="Overtrading">Overtrading</option><option value="SL déplacé">SL déplacé</option><option value="TP trop tôt">TP trop tôt</option><option value="Contre tendance">Contre tendance</option><option value="Mauvais timing">Mauvais timing</option><option value="Taille trop grande">Taille trop grande</option><option value="Pas de setup">Pas de setup</option><option value="Autre">Autre</option></select><input id="f-error-custom" type="text" placeholder="Décris ton erreur..." style="display:none;margin-top:6px;width:100%;box-sizing:border-box"></div>
           <div class="field"><label>Émotion</label><select id="f-emotion"><option>Neutre</option><option>Confiant</option><option>Hésitant</option><option>FOMO</option><option>Stressé</option><option>Discipliné</option></select></div>
         </div>
         <div class="field" style="margin-top:12px"><label>Notes</label><textarea id="f-notes" placeholder="Contexte du marché, raison d'entrée, leçon apprise..."></textarea></div>
@@ -415,7 +415,7 @@ tr:hover td{background:var(--bg3)}
       <div class="field"><label>P&L ($)</label><input id="edit-pnl" type="number" step="any"></div>
       <div class="field"><label>Stratégie</label><select id="edit-strategy"><option>EMA + VWAP</option><option>OPR + Retest</option><option>TPO / POC</option><option>Confluence Multi-TF</option><option>Breakout</option><option>Support/Résistance</option><option>Zone Fibonacci</option><option>Rotation</option><option>Tendance</option><option>Autre</option></select></div>
       <div class="field"><label>Émotion</label><select id="edit-emotion"><option>Neutre</option><option>Confiant</option><option>Hésitant</option><option>FOMO</option><option>Stressé</option><option>Discipliné</option></select></div>
-      <div class="field"><label>Erreur commise</label><select id="edit-error"><option value="">Aucune ✅</option><option value="FOMO">FOMO</option><option value="Revenge">Revenge</option><option value="Overtrading">Overtrading</option><option value="SL déplacé">SL déplacé</option><option value="TP trop tôt">TP trop tôt</option><option value="Contre tendance">Contre tendance</option><option value="Mauvais timing">Mauvais timing</option><option value="Taille trop grande">Taille trop grande</option><option value="Pas de setup">Pas de setup</option><option value="Autre">Autre</option></select></div>
+      <div class="field"><label>Erreur commise</label><select id="edit-error" onchange="toggleCustomError('edit-error-custom',this.value)"><option value="">Aucune ✅</option><option value="FOMO">FOMO</option><option value="Revenge">Revenge</option><option value="Overtrading">Overtrading</option><option value="SL déplacé">SL déplacé</option><option value="TP trop tôt">TP trop tôt</option><option value="Contre tendance">Contre tendance</option><option value="Mauvais timing">Mauvais timing</option><option value="Taille trop grande">Taille trop grande</option><option value="Pas de setup">Pas de setup</option><option value="Autre">Autre</option></select><input id="edit-error-custom" type="text" placeholder="Décris ton erreur..." style="display:none;margin-top:6px;width:100%;box-sizing:border-box"></div>
       <div class="field"><label>Session</label><select id="edit-session"><option value="Europe">Europe</option><option value="US">US</option><option value="Autre">Autre</option></select></div>
     </div>
     <div class="field" style="margin-top:10px"><label>Notes</label><textarea id="edit-notes" style="min-height:60px"></textarea></div>
@@ -620,11 +620,23 @@ function hideAlerts(){document.getElementById('import-ok').style.display='none';
 function showOk(){document.getElementById('import-ok').style.display='flex';}
 function showErr(msg){document.getElementById('import-err-msg').textContent=msg;document.getElementById('import-err').style.display='flex';}
 
+function toggleCustomError(inputId, val){
+  var el=document.getElementById(inputId);
+  if(!el)return;
+  if(val==='Autre'){el.style.display='block';el.focus();}
+  else{el.style.display='none';el.value='';}
+}
+function getErrorValue(selectId, customId){
+  var sel=document.getElementById(selectId);
+  if(!sel)return'';
+  if(sel.value==='Autre'){var c=document.getElementById(customId);return c&&c.value.trim()?c.value.trim():'Autre';}
+  return sel.value;
+}
 function saveTrade(){
   var symbol=(document.getElementById('f-symbol').value||'').toUpperCase().trim();
   if(!symbol){alert('Entre un actif !');return;}
   var pnl=parseFloat(document.getElementById('f-pnl').value)||0;
-  var t={id:Date.now(),symbol:symbol,side:document.getElementById('f-side').value,date:document.getElementById('f-date').value,entry:parseFloat(document.getElementById('f-entry').value)||0,sl:parseFloat(document.getElementById('f-sl').value)||0,tp:parseFloat(document.getElementById('f-tp').value)||0,tp2:parseFloat(document.getElementById('f-tp2').value)||0,size:parseFloat(document.getElementById('f-size').value)||1,status:document.getElementById('f-status').value,exit:0,pnl:pnl,netPnl:pnl,strategy:document.getElementById('f-strategy').value,emotion:document.getElementById('f-emotion').value,error:(document.getElementById('f-error')?document.getElementById('f-error').value:''),session:(document.getElementById('f-session')?document.getElementById('f-session').value:'US'),notes:document.getElementById('f-notes').value};
+  var t={id:Date.now(),symbol:symbol,side:document.getElementById('f-side').value,date:document.getElementById('f-date').value,entry:parseFloat(document.getElementById('f-entry').value)||0,sl:parseFloat(document.getElementById('f-sl').value)||0,tp:parseFloat(document.getElementById('f-tp').value)||0,tp2:parseFloat(document.getElementById('f-tp2').value)||0,size:parseFloat(document.getElementById('f-size').value)||1,status:document.getElementById('f-status').value,exit:0,pnl:pnl,netPnl:pnl,strategy:document.getElementById('f-strategy').value,emotion:document.getElementById('f-emotion').value,error:getErrorValue('f-error','f-error-custom'),session:(document.getElementById('f-session')?document.getElementById('f-session').value:'US'),notes:document.getElementById('f-notes').value};
   var photo=getPhotoData('f-photo-img');if(photo)t.photo=photo;
   t.account=currentAccount;
   apiPost(t).then(function(saved){
@@ -730,7 +742,10 @@ function openEditModal(id){
   document.getElementById('edit-pnl').value=t.pnl||'';
   document.getElementById('edit-strategy').value=t.strategy||'EMA + VWAP';
   document.getElementById('edit-emotion').value=t.emotion||'Neutre';
-  document.getElementById('edit-error').value=t.error||'';
+  var knownErrs=['','FOMO','Revenge','Overtrading','SL d\u00e9plac\u00e9','TP trop t\u00f4t','Contre tendance','Mauvais timing','Taille trop grande','Pas de setup','Autre'];
+  var errVal=t.error||'';
+  if(errVal&&knownErrs.indexOf(errVal)===-1){document.getElementById('edit-error').value='Autre';document.getElementById('edit-error-custom').value=errVal;document.getElementById('edit-error-custom').style.display='block';}
+  else{document.getElementById('edit-error').value=errVal;document.getElementById('edit-error-custom').style.display='none';document.getElementById('edit-error-custom').value='';}
   document.getElementById('edit-session').value=t.session||'US';
   document.getElementById('edit-notes').value=t.notes||'';
   // Load existing photos
@@ -755,7 +770,7 @@ function confirmEdit(){
   var id=(document.getElementById('edit-id').value||'').toString();
   var idx=trades.findIndex(function(t){return (t.id||t._id||'').toString()===id.toString();});if(idx===-1)return;
   var pnl=parseFloat(document.getElementById('edit-pnl').value)||0;
-  trades[idx]=Object.assign({},trades[idx],{symbol:(document.getElementById('edit-symbol').value||'').toUpperCase().trim(),side:document.getElementById('edit-side').value,date:document.getElementById('edit-date').value,entry:parseFloat(document.getElementById('edit-entry').value)||0,sl:parseFloat(document.getElementById('edit-sl').value)||0,tp:parseFloat(document.getElementById('edit-tp').value)||0,tp2:parseFloat(document.getElementById('edit-tp2').value)||0,size:parseFloat(document.getElementById('edit-size').value)||1,status:document.getElementById('edit-status').value,pnl:pnl,netPnl:pnl,strategy:document.getElementById('edit-strategy').value,emotion:document.getElementById('edit-emotion').value,error:document.getElementById('edit-error').value,session:document.getElementById('edit-session').value,notes:document.getElementById('edit-notes').value});
+  trades[idx]=Object.assign({},trades[idx],{symbol:(document.getElementById('edit-symbol').value||'').toUpperCase().trim(),side:document.getElementById('edit-side').value,date:document.getElementById('edit-date').value,entry:parseFloat(document.getElementById('edit-entry').value)||0,sl:parseFloat(document.getElementById('edit-sl').value)||0,tp:parseFloat(document.getElementById('edit-tp').value)||0,tp2:parseFloat(document.getElementById('edit-tp2').value)||0,size:parseFloat(document.getElementById('edit-size').value)||1,status:document.getElementById('edit-status').value,pnl:pnl,netPnl:pnl,strategy:document.getElementById('edit-strategy').value,emotion:document.getElementById('edit-emotion').value,error:getErrorValue('edit-error','edit-error-custom'),session:document.getElementById('edit-session').value,notes:document.getElementById('edit-notes').value});
   // Save photos — null = unchanged, '' = deleted, 'data:...' = new photo
   if(editPhotoEntry !== null) trades[idx].photo = editPhotoEntry || undefined;
   if(editPhotoExit !== null) trades[idx].photoExit = editPhotoExit || undefined;
