@@ -105,6 +105,11 @@ tr:hover td{background:var(--bg3)}
 .preview-wrap{max-height:220px;overflow-y:auto;margin-top:1rem;border-radius:8px;border:1px solid var(--border);display:none}
 /* NOTES */
 .note-card{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;font-size:13px;color:var(--text2);line-height:1.5}
+.day-summary-row td{padding:0!important;border:none!important}
+.day-summary-wrap{padding:4px 14px 8px;background:var(--bg2)}
+.day-summary-input{width:100%;background:transparent;border:none;border-bottom:1px dashed var(--border);color:var(--text2);font-size:12px;font-family:var(--font);padding:5px 2px;outline:none;resize:none;min-height:24px;box-sizing:border-box;transition:border-color .2s}
+.day-summary-input:focus{border-bottom-color:var(--purple);color:var(--text1)}
+.day-summary-input::placeholder{color:var(--text3);font-style:italic}
 .note-date{font-size:11px;color:var(--text3);margin-top:6px}
 /* MODAL */
 .modal-bg{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:999;backdrop-filter:blur(4px)}
@@ -684,7 +689,9 @@ function renderTrades(){
       var dayPnl=list.filter(function(x){return x.date===t.date;}).reduce(function(s,x){return s+(x.pnl||0);},0);
       var dayColor=dayPnl>0?'var(--green)':dayPnl<0?'var(--red)':'var(--text3)';
       var dateDisplay=t.date?t.date.split('-').reverse().join('/'):'';
-      rows.push('<tr><td colspan="15" style="padding:6px 12px;background:var(--bg2);border-top:1px solid var(--border);border-bottom:1px solid var(--border)"><div style="display:flex;align-items:center;gap:10px"><div style="flex:1;height:1px;background:var(--border)"></div><span style="font-size:11px;font-weight:700;color:var(--text2);white-space:nowrap">📅 '+dateDisplay+'</span><div style="flex:1;height:1px;background:var(--border)"></div><span style="font-size:11px;font-weight:700;color:'+dayColor+'">'+( dayPnl>0?'+':'')+dayPnl.toFixed(2)+'$</span></div></td></tr>');
+      var daySumKey='tj_daysum_'+currentAccount+'_'+t.date;var daySumVal=localStorage.getItem(daySumKey)||'';
+      rows.push('<tr><td colspan="15" style="padding:6px 12px;background:var(--bg2);border-top:2px solid var(--border)"><div style="display:flex;align-items:center;gap:10px"><div style="flex:1;height:1px;background:var(--border)"></div><span style="font-size:11px;font-weight:700;color:var(--text2);white-space:nowrap">📅 '+dateDisplay+'</span><div style="flex:1;height:1px;background:var(--border)"></div><span style="font-size:11px;font-weight:700;color:'+dayColor+'">'+( dayPnl>0?'+':'')+dayPnl.toFixed(2)+'$</span></div></td></tr>');
+      rows.push('<tr class="day-summary-row"><td colspan="15"><div class="day-summary-wrap"><textarea class="day-summary-input" rows="1" data-date="'+t.date+'" placeholder="📝 Résumé du jour — stratégie, émotions, leçons...">'+daySumVal.replace(/</g,'&lt;')+'</textarea></div></td></tr>');
       lastDate=t.date;
     }
     var row='<tr><td style="white-space:nowrap">'+t.date+'</td><td><strong>'+t.symbol+'</strong></td><td><span class="badge '+(t.side==='BUY'?'buy':'sell')+'">'+(t.side==='BUY'?'Long':'Short')+'</span></td><td style="color:var(--text2)">'+((t.lots||t.size||t.qty||'—'))+'</td><td>'+(t.entry||'—')+'</td><td style="color:var(--red)">'+(t.sl||'—')+'</td><td style="color:var(--green)">'+(t.tp||'—')+'</td><td style="color:var(--green)">'+(t.tp2||'—')+'</td><td>'+(t.size||1)+'</td><td style="color:'+pnlColor+';font-weight:600">'+(t.pnl>0?'+':'')+(t.pnl?t.pnl.toFixed(2):'—')+'</td><td style="color:'+netColor+';font-weight:600">'+(net>0?'+':'')+(net?net.toFixed(2):'—')+'</td><td><span class="badge '+(isOpen?'open':isWin?'win':'loss')+'">'+(isOpen?'Ouvert':isWin?'Win':'Loss')+'</span></td><td style="font-size:11px;color:var(--text2)">'+(t.strategy||'—')+'</td><td style="font-size:11px;color:var(--text3);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(t.notes||'—')+'</td><td style="white-space:nowrap"><button class="btn btn-edit" data-id="'+ tid +'" style="padding:3px 8px;font-size:11px;margin-right:4px"><i class="ti ti-pencil"></i></button>'+(isOpen?'<button class="btn success btn-close-trade" data-id="'+ tid +'" style="padding:3px 8px;font-size:11px;margin-right:4px"><i class="ti ti-lock"></i></button>':'')+' <button class="btn danger btn-delete" data-id="'+ tid +'" style="padding:3px 8px;font-size:11px"><i class="ti ti-trash"></i></button></td></tr>'
@@ -696,6 +703,14 @@ function renderTrades(){
 
 
 // Event delegation for MongoDB string IDs
+document.addEventListener('input', function(e){
+  var ta=e.target.closest('.day-summary-input');
+  if(!ta)return;
+  var date=ta.getAttribute('data-date');
+  if(!date)return;
+  var key='tj_daysum_'+currentAccount+'_'+date;
+  if(ta.value.trim()){localStorage.setItem(key,ta.value);}else{localStorage.removeItem(key);}
+});
 document.addEventListener('click', function(e){
   var editBtn = e.target.closest('.btn-edit');
   var closeBtn = e.target.closest('.btn-close-trade');
