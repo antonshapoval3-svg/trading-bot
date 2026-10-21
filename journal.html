@@ -380,6 +380,7 @@ tr:hover td{background:var(--bg3)}
         </div>
         <div style="display:flex;gap:8px">
           <button class="btn" style="font-size:12px;padding:5px 12px" onclick="exportCSV()"><i class="ti ti-download"></i> Export CSV</button>
+          <button class="btn" style="font-size:12px;padding:5px 12px;background:var(--purple)" onclick="exportPDF()"><i class="ti ti-file-text"></i> Récap PDF</button>
           <button class="btn danger" style="font-size:12px;padding:5px 12px" onclick="clearAll()"><i class="ti ti-trash"></i> Tout effacer</button>
         </div>
       </div>
@@ -782,6 +783,87 @@ function exportCSV(){
   var rows=trades.map(function(t){return[t.date,t.symbol,t.side==='BUY'?'Long':'Short',t.entry,t.sl,t.tp,t.tp2,t.size,t.pnl,t.netPnl,t.status==='open'?'Ouvert':t.pnl>=0?'Win':'Loss',t.strategy,t.emotion,t.notes];});
   var csv=[h].concat(rows).map(function(r){return r.map(function(v){return'"'+(v||'').toString().replace(/"/g,'""')+'"';}).join(',');}).join('\n');
   var a=document.createElement('a');a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);a.download='journal.csv';a.click();
+}
+
+function exportPDF(){
+  if(!trades.length){alert('Aucun trade \u00E0 exporter.');return;}
+  var closed=trades.filter(function(t){return t.status==='closed';});
+  var all=trades.slice().sort(function(a,b){var da=a.date||'',db=b.date||'';if(da!==db)return db.localeCompare(da);var ta=a.entryTime||a.tp2||'00:00',tb=b.entryTime||b.tp2||'00:00';return ta.localeCompare(tb);});
+
+  // Global stats
+  var totalPnl=closed.reduce(function(s,t){return s+(t.pnl||0);},0);
+  var totalComm=closed.reduce(function(s,t){return s+(t.commission!=null?t.commission:getCommission(t.symbol,t.lots||t.size||1));},0);
+  var totalNet=closed.reduce(function(s,t){return s+(t.commission!=null?(t.netPnl!=null?t.netPnl:t.pnl-(t.commission||0)):(t.pnl||0)-getCommission(t.symbol,t.lots||t.size||1));},0);
+  var wins=closed.filter(function(t){return t.pnl>0;});
+  var losses=closed.filter(function(t){return t.pnl<0;});
+  var wr=closed.length?Math.round(wins.length/closed.length*100):0;
+  var avgWin=wins.length?wins.reduce(function(s,t){return s+t.pnl;},0)/wins.length:0;
+  var avgLoss=losses.length?Math.abs(losses.reduce(function(s,t){return s+t.pnl;},0)/losses.length):0;
+  var rr=avgLoss?avgWin/avgLoss:0;
+  var gGain=wins.reduce(function(s,t){return s+t.pnl;},0);
+  var gLoss=Math.abs(losses.reduce(function(s,t){return s+t.pnl;},0));
+  var pf=gLoss>0?gGain/gLoss:gGain>0?999:0;
+
+  // Error stats
+  var errMap={};closed.forEach(function(t){if(t.error){var e=t.error||'';if(!errMap[e])errMap[e]={count:0,pnl:0};errMap[e].count++;errMap[e].pnl+=(t.pnl||0);}});
+  var errRows='';Object.keys(errMap).sort(function(a,b){return errMap[b].count-errMap[a].count;}).forEach(function(e){errRows+='<tr><td>'+e+'</td><td>'+errMap[e].count+'</td><td style="color:'+(errMap[e].pnl<0?'#e11d48':'#059669')+'">'+( errMap[e].pnl>0?'+':'')+errMap[e].pnl.toFixed(2)+'$</td></tr>';});
+
+  // Per-day summaries
+  var dayMap={};all.forEach(function(t){if(!t.date)return;if(!dayMap[t.date])dayMap[t.date]=[];dayMap[t.date].push(t);});
+  var dayRows='';Object.keys(dayMap).sort().reverse().forEach(function(date){
+    var dts=dayMap[date];
+    var dNet=dts.reduce(function(s,t){return s+(t.commission!=null?(t.netPnl!=null?t.netPnl:t.pnl-(t.commission||0)):(t.pnl||0)-getCommission(t.symbol,t.lots||t.size||1));},0);
+    var dWins=dts.filter(function(t){return t.pnl>0;}).length;
+    var dColor=dNet>0?'#059669':'#e11d48';
+    var dd=date.split('-').reverse().join('/');
+    var sumKey='tj_daysum_'+currentAccount+'_'+date;
+    var sumText=localStorage.getItem(sumKey)||'';
+    var tradeList=dts.map(function(t){
+      var tNet=t.commission!=null?(t.netPnl!=null?t.netPnl:t.pnl-(t.commission||0)):(t.pnl||0)-getCommission(t.symbol,t.lots||t.size||1);
+      var tc=t.commission!=null?t.commission:getCommission(t.symbol,t.lots||t.size||1);
+      var errBadge=t.error?'<span style="background:#fef2f2;color:#e11d48;padding:1px 5px;border-radius:3px;font-size:10px;margin-left:4px">\u26A0 '+t.error+'</span>':'';
+      return '<tr><td>'+(t.entryTime||t.tp2||'\u2014')+'</td><td><strong>'+t.symbol+'</strong></td><td>'+(t.side==='BUY'?'Long \u2191':'Short \u2193')+'</td><td>'+(t.lots||t.size||'\u2014')+'</td><td>'+(t.pnl>0?'+':'')+t.pnl.toFixed(2)+'$</td><td style="color:'+( tc>0?'#6b7280':'inherit')+'">-'+tc.toFixed(2)+'$</td><td style="color:'+dColor+';font-weight:600">'+(tNet>0?'+':'')+tNet.toFixed(2)+'$</td><td>'+(t.session||'\u2014')+'</td><td>'+(t.strategy||'\u2014')+'</td><td>'+errBadge+(t.error?'':t.notes||'\u2014')+'</td></tr>';
+    }).join('');
+    dayRows+='<div style="margin-bottom:20px;page-break-inside:avoid"><div style="background:#f8f9fa;border-left:4px solid '+(dNet>0?'#059669':'#e11d48')+';padding:8px 14px;display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;border-radius:0 6px 6px 0"><span style="font-weight:700;color:#1e293b">\uD83D\uDCC5 '+dd+'</span><span style="font-size:13px;color:#64748b">'+dts.length+' trades \u2014 '+dWins+'W/'+( dts.length-dWins)+'L</span><span style="font-weight:700;color:'+dColor+';font-size:15px">'+(dNet>0?'+':'')+dNet.toFixed(2)+'$</span></div><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#f1f5f9;color:#475569"><th>Heure</th><th>Actif</th><th>Dir.</th><th>Qt\u00E9</th><th>P&L brut</th><th>Comm.</th><th>Net</th><th>Session</th><th>Strat\u00E9gie</th><th>Note / Erreur</th></tr></thead><tbody>'+tradeList+'</tbody></table>'+(sumText?'<div style="margin-top:6px;padding:6px 10px;background:#fffbeb;border-radius:4px;font-size:11px;color:#78350f;font-style:italic">\uD83D\uDCDD '+sumText+'</div>':'')+'</div>';
+  });
+
+  var today=new Date().toLocaleDateString('fr-FR');
+  var account=currentAccount||'Mon compte';
+  var html='<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>R\u00E9cap Trading \u2014 '+account+'</title><style>'
+    +'*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#1e293b;padding:24px 32px;background:#fff}'
+    +'h1{font-size:20px;font-weight:700;color:#1e293b;margin-bottom:4px}h2{font-size:14px;font-weight:700;color:#334155;margin:18px 0 8px;border-bottom:1px solid #e2e8f0;padding-bottom:4px}'
+    +'.subtitle{font-size:11px;color:#64748b;margin-bottom:20px}'
+    +'.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}'
+    +'.kpi{background:#f8f9fa;border-radius:6px;padding:10px 14px;border-left:3px solid #6366f1}'
+    +'.kpi-label{font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}'
+    +'.kpi-val{font-size:18px;font-weight:700}'
+    +'.kpi-sub{font-size:10px;color:#94a3b8}'
+    +'table{width:100%;border-collapse:collapse}th{background:#f1f5f9;color:#475569;font-size:10px;padding:5px 7px;text-align:left;font-weight:600}td{padding:4px 7px;border-bottom:1px solid #f1f5f9;font-size:11px}'
+    +'.green{color:#059669}.red{color:#e11d48}'
+    +'@media print{body{padding:10px}@page{margin:15mm;size:A4}}'
+    +'</style></head><body>'
+    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">'
+    +'<div><h1>\uD83D\uDCCA R\u00E9cap Journal de Trading</h1><div class="subtitle">Compte : <strong>'+account+'</strong> &nbsp;\u00B7&nbsp; G\u00E9n\u00E9r\u00E9 le '+today+' &nbsp;\u00B7&nbsp; '+closed.length+' trades cl\u00F4tur\u00E9s</div></div>'
+    +'<div style="text-align:right;font-size:10px;color:#94a3b8">Apex Trader Funding<br>Commissions incluses</div></div>'
+
+    +'<h2>\uD83D\uDCC8 Statistiques globales</h2>'
+    +'<div class="kpi-grid">'
+    +'<div class="kpi"><div class="kpi-label">Net P&L</div><div class="kpi-val '+(totalNet>=0?'green':'red')+'">'+(totalNet>=0?'+':'')+totalNet.toFixed(2)+'$</div><div class="kpi-sub">brut '+(totalPnl>=0?'+':'')+totalPnl.toFixed(2)+'$ \u2014 comm -'+totalComm.toFixed(2)+'$</div></div>'
+    +'<div class="kpi"><div class="kpi-label">Win Rate</div><div class="kpi-val '+(wr>=50?'green':'red')+'">'+wr+'%</div><div class="kpi-sub">'+wins.length+'W &nbsp;/&nbsp; '+losses.length+'L</div></div>'
+    +'<div class="kpi"><div class="kpi-label">Profit Factor</div><div class="kpi-val">'+(pf===999?'\u221E':pf.toFixed(2))+'</div><div class="kpi-sub">+'+avgWin.toFixed(2)+'$ avg win</div></div>'
+    +'<div class="kpi"><div class="kpi-label">Risk/Reward</div><div class="kpi-val">'+rr.toFixed(2)+'</div><div class="kpi-sub">avg loss '+avgLoss.toFixed(2)+'$</div></div>'
+    +'</div>'
+
+    +(errRows?'<h2>\u26A0\uFE0F Erreurs commises</h2><table><thead><tr><th>Erreur</th><th>Occurences</th><th>Impact P&L</th></tr></thead><tbody>'+errRows+'</tbody></table>':'')
+
+    +'<h2>\uD83D\uDCC5 D\u00E9tail par jour</h2>'
+    +dayRows
+    +'</body></html>';
+
+  var w=window.open('','_blank','width=900,height=700');
+  w.document.write(html);
+  w.document.close();
+  setTimeout(function(){w.focus();w.print();},600);
 }
 
 function openEditModal(id){
