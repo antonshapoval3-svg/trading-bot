@@ -968,16 +968,15 @@ function exportPDF(){
     +'table{width:100%;border-collapse:collapse}'
     +'th{background:#f1f5f9;color:#475569;font-size:10px;text-align:left;font-weight:600}'
     +'td{font-size:11px;color:#1e293b}'
-    +'@media print{body{padding:10px}.no-break{page-break-inside:avoid}@page{margin:12mm;size:A4}.zoom-overlay{display:none!important}}'
     +'img.zoomable{cursor:zoom-in;transition:opacity .15s}'
     +'img.zoomable:hover{opacity:.85}'
-    +'.zoom-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);z-index:9999;align-items:center;justify-content:center;cursor:zoom-out}'
+    +'.zoom-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.88);z-index:9999;align-items:center;justify-content:center;cursor:zoom-out}'
     +'.zoom-overlay.active{display:flex}'
     +'.zoom-overlay img{max-width:92vw;max-height:90vh;border-radius:6px;box-shadow:0 8px 40px rgba(0,0,0,.6);object-fit:contain}'
     +'</style>'
     +'<div class="zoom-overlay" id="zoomOverlay" onclick="this.classList.remove(\'active\')"><img id="zoomImg" src=""></div>'
     +'<script>function zoomPhoto(src){document.getElementById(\'zoomImg\').src=src;document.getElementById(\'zoomOverlay\').classList.add(\'active\');}document.addEventListener(\'keydown\',function(e){if(e.key===\'Escape\')document.getElementById(\'zoomOverlay\').classList.remove(\'active\');});<\/script>'
-    +'</head><body onload="setTimeout(function(){window.print();},400)">'
+    +'</head><body>'
     +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;padding-bottom:12px;border-bottom:2px solid #e2e8f0">'
     +'<div><h1>\uD83D\uDCCA Journal de Trading</h1>'
     +'<div class="subtitle">Compte : <strong>'+account+'</strong> &nbsp;\u00B7&nbsp; P\u00E9riode : <strong>'+periodLabel+'</strong> &nbsp;\u00B7&nbsp; G\u00E9n\u00E9r\u00E9 le '+today+'</div></div>'
@@ -997,19 +996,112 @@ function exportPDF(){
     +dayRows
     +'</body></html>';
 
-  // Ouvrir dans un nouvel onglet → impression auto → "Enregistrer en PDF"
-  var blob=new Blob([html],{type:'text/html;charset=utf-8'});
-  var url=URL.createObjectURL(blob);
-  var win=window.open(url,'_blank');
-  if(!win){
-    // Popup bloqué : fallback téléchargement direct HTML
-    var from2=document.getElementById('pdf-date-from').value||'recap';
-    var to2=document.getElementById('pdf-date-to').value||'';
-    var fname='recap-trading-'+(from2===to2||!to2?from2:from2+'_'+to2)+'.html';
-    var a=document.createElement('a');a.href=url;a.download=fname;
-    document.body.appendChild(a);a.click();document.body.removeChild(a);
+  // Rendu dans un iframe caché → html2canvas → jsPDF → téléchargement direct .pdf
+  var from2=document.getElementById('pdf-date-from').value||'recap';
+  var to2=document.getElementById('pdf-date-to').value||'';
+  var fname='recap-trading-'+(from2===to2||!to2?from2:from2+'_'+to2)+'.pdf';
+
+  // Indicateur de chargement
+  var loadBtn=document.querySelector('[onclick="exportPDF()"]');
+  // bouton pas dispo ici car modale fermée, on utilise un toast
+  var toast=document.createElement('div');
+  toast.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#7c3aed;color:#fff;padding:10px 22px;border-radius:8px;font-size:13px;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.4)';
+  toast.textContent='⏳ Génération du PDF…';
+  document.body.appendChild(toast);
+
+  function loadScript(src,cb){
+    if(document.querySelector('script[src="'+src+'"]')){cb();return;}
+    var s=document.createElement('script');s.src=src;s.onload=cb;s.onerror=function(){cb(new Error('load fail'));};document.head.appendChild(s);
   }
-  setTimeout(function(){URL.revokeObjectURL(url);},120000);
+
+  loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',function(e1){
+    if(e1){document.body.removeChild(toast);alert('Erreur chargement html2canvas');return;}
+    loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',function(e2){
+      if(e2){document.body.removeChild(toast);alert('Erreur chargement jsPDF');return;}
+
+      // Créer un iframe off-screen pour rendre le HTML
+      var iframe=document.createElement('iframe');
+      iframe.style.cssText='position:fixed;left:-9999px;top:0;width:900px;height:1px;visibility:hidden;border:none';
+      document.body.appendChild(iframe);
+      iframe.contentDocument.open();
+      iframe.contentDocument.write(html);
+      iframe.contentDocument.close();
+
+      // Attendre que les images soient chargées
+      var imgEls=iframe.contentDocument.querySelectorAll('img');
+      var imgCount=imgEls.length;
+      var imgDone=0;
+      function onImgDone(){
+        imgDone++;
+        if(imgDone>=imgCount) generate();
+      }
+      if(imgCount===0){
+        generate();
+      } else {
+        imgEls.forEach(function(img){
+          if(img.complete) onImgDone();
+          else {img.onload=onImgDone; img.onerror=onImgDone;}
+        });
+      }
+
+      function generate(){
+        var body=iframe.contentDocument.body;
+        var totalH=body.scrollHeight;
+        iframe.style.height=totalH+'px';
+
+        setTimeout(function(){
+          html2canvas(body,{
+            scale:2,
+            useCORS:true,
+            allowTaint:true,
+            scrollY:0,
+            width:900,
+            height:totalH,
+            windowWidth:900,
+            windowHeight:totalH
+          }).then(function(canvas){
+            document.body.removeChild(iframe);
+            var jsPDF=window.jspdf.jsPDF;
+            var pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+            var pageW=pdf.internal.pageSize.getWidth();
+            var pageH=pdf.internal.pageSize.getHeight();
+            var margin=10;
+            var imgW=pageW-margin*2;
+            var canvW=canvas.width;
+            var canvH=canvas.height;
+            var ratio=canvW/(imgW*3.7795); // px per mm at 96dpi
+            var totalPages=Math.ceil(canvH/(pageH-margin*2)*ratio/3.7795);
+
+            var pageCanvas=document.createElement('canvas');
+            pageCanvas.width=canvW;
+            var sliceH=Math.floor((pageH-margin*2)*3.7795*(canvas.width/900)*2);
+            pageCanvas.height=sliceH;
+            var ctx=pageCanvas.getContext('2d');
+
+            var yOffset=0;
+            var page=0;
+            while(yOffset<canvH){
+              if(page>0) pdf.addPage();
+              ctx.clearRect(0,0,pageCanvas.width,pageCanvas.height);
+              ctx.drawImage(canvas,0,yOffset,canvW,sliceH,0,0,canvW,sliceH);
+              var imgData=pageCanvas.toDataURL('image/jpeg',0.92);
+              var imgHmm=(sliceH/canvW)*imgW/2*25.4/96*3.7795;
+              pdf.addImage(imgData,'JPEG',margin,margin,imgW,Math.min(imgHmm,pageH-margin*2));
+              yOffset+=sliceH;
+              page++;
+            }
+
+            pdf.save(fname);
+            document.body.removeChild(toast);
+          }).catch(function(err){
+            document.body.removeChild(iframe);
+            document.body.removeChild(toast);
+            alert('Erreur génération PDF : '+err.message);
+          });
+        },500);
+      }
+    });
+  });
 }
 
 function openEditModal(id){
