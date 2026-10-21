@@ -517,7 +517,7 @@ tr:hover td{background:var(--bg3)}
     </div>
     <div style="display:flex;gap:10px;margin-top:20px">
       <button onclick="closePDFModal()" style="flex:1;padding:9px;background:var(--bg3);border:1px solid var(--border);color:var(--text2);border-radius:6px;cursor:pointer;font-size:12px">Annuler</button>
-      <button onclick="exportPDF()" style="flex:2;padding:9px;background:var(--purple);border:none;color:#fff;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600"><i class="ti ti-printer"></i> Générer & Imprimer</button>
+      <button onclick="exportPDF()" style="flex:2;padding:9px;background:var(--purple);border:none;color:#fff;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600"><i class="ti ti-download"></i> Télécharger</button>
     </div>
   </div>
 </div>
@@ -989,11 +989,19 @@ function exportPDF(){
     +dayRows
     +'</body></html>';
 
-  var w=window.open('','_blank','width=960,height=750');
-  if(!w){alert('Autorise les popups pour g\u00E9n\u00E9rer le PDF.');return;}
-  w.document.write(html);
-  w.document.close();
-  setTimeout(function(){w.focus();w.print();},700);
+  // Télécharger directement le fichier HTML
+  var from2=document.getElementById('pdf-date-from').value||'recap';
+  var to2=document.getElementById('pdf-date-to').value||'';
+  var fname='recap-trading-'+(from2===to2||!to2?from2:from2+'_'+to2)+'.html';
+  var blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url;
+  a.download=fname;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function(){URL.revokeObjectURL(url);},5000);
 }
 
 function openEditModal(id){
