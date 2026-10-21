@@ -110,6 +110,8 @@ tr:hover td{background:var(--bg3)}
 .day-summary-input{width:100%;background:transparent;border:none;border-bottom:1px dashed var(--border);color:#ffffff;font-size:12px;font-weight:700;font-family:var(--font);padding:5px 2px;outline:none;resize:none;min-height:24px;box-sizing:border-box;transition:border-color .2s}
 .day-summary-input:focus{border-bottom-color:var(--purple);color:#ffffff}
 .day-summary-input::placeholder{color:var(--text3);font-style:italic;font-weight:400}
+.pdf-range-btn{background:var(--bg3);border:1px solid var(--border);color:var(--text2);padding:5px 12px;border-radius:20px;font-size:11px;cursor:pointer;transition:all .15s}
+.pdf-range-btn.active,.pdf-range-btn:hover{background:var(--purple);border-color:var(--purple);color:#fff}
 .note-date{font-size:11px;color:var(--text3);margin-top:6px}
 /* MODAL */
 .modal-bg{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:999;backdrop-filter:blur(4px)}
@@ -380,7 +382,7 @@ tr:hover td{background:var(--bg3)}
         </div>
         <div style="display:flex;gap:8px">
           <button class="btn" style="font-size:12px;padding:5px 12px" onclick="exportCSV()"><i class="ti ti-download"></i> Export CSV</button>
-          <button class="btn" style="font-size:12px;padding:5px 12px;background:var(--purple)" onclick="exportPDF()"><i class="ti ti-file-text"></i> Récap PDF</button>
+          <button class="btn" style="font-size:12px;padding:5px 12px;background:var(--purple)" onclick="openPDFModal()"><i class="ti ti-file-text"></i> Récap PDF</button>
           <button class="btn danger" style="font-size:12px;padding:5px 12px" onclick="clearAll()"><i class="ti ti-trash"></i> Tout effacer</button>
         </div>
       </div>
@@ -476,6 +478,48 @@ tr:hover td{background:var(--bg3)}
 <!-- PHOTO MODAL -->
 <div class="photo-modal" id="photo-modal" onclick="this.classList.remove('show')">
   <img id="photo-modal-img" src="" alt="Capture agrandie">
+</div>
+
+<!-- MODAL RÉCAP PDF -->
+<div id="pdf-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9998;align-items:center;justify-content:center">
+  <div style="background:var(--bg2);border-radius:12px;padding:28px 32px;width:420px;max-width:95vw;border:1px solid var(--border)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <div style="font-size:15px;font-weight:700;color:var(--text)">📄 Générer un récap PDF</div>
+      <button onclick="closePDFModal()" style="background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer;line-height:1">&times;</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div>
+        <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:6px">Période</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="pdf-range-btn active" data-range="all" onclick="setPDFRange(this)">Tout</button>
+          <button class="pdf-range-btn" data-range="week" onclick="setPDFRange(this)">Cette semaine</button>
+          <button class="pdf-range-btn" data-range="month" onclick="setPDFRange(this)">Ce mois</button>
+          <button class="pdf-range-btn" data-range="custom" onclick="setPDFRange(this)">Dates perso</button>
+        </div>
+      </div>
+      <div id="pdf-custom-dates" style="display:none;gap:8px">
+        <div style="flex:1"><label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px">Du</label><input type="date" id="pdf-date-from" onchange="updatePDFCount()" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 8px;font-size:12px"></div>
+        <div style="flex:1"><label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px">Au</label><input type="date" id="pdf-date-to" onchange="updatePDFCount()" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 8px;font-size:12px"></div>
+      </div>
+      <div>
+        <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:8px">Options</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text);cursor:pointer;margin-bottom:8px">
+          <input type="checkbox" id="pdf-opt-photos" checked style="width:14px;height:14px;accent-color:var(--purple)"> Inclure les captures d'écran
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text);cursor:pointer;margin-bottom:8px">
+          <input type="checkbox" id="pdf-opt-errors" checked style="width:14px;height:14px;accent-color:var(--purple)"> Inclure le tableau des erreurs
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text);cursor:pointer">
+          <input type="checkbox" id="pdf-opt-summary" checked style="width:14px;height:14px;accent-color:var(--purple)"> Inclure les résumés de jour
+        </label>
+      </div>
+      <div id="pdf-trade-count" style="font-size:11px;color:var(--text3);padding:6px 10px;background:var(--bg3);border-radius:6px"></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:20px">
+      <button onclick="closePDFModal()" style="flex:1;padding:9px;background:var(--bg3);border:1px solid var(--border);color:var(--text2);border-radius:6px;cursor:pointer;font-size:12px">Annuler</button>
+      <button onclick="exportPDF()" style="flex:2;padding:9px;background:var(--purple);border:none;color:#fff;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600"><i class="ti ti-printer"></i> Générer & Imprimer</button>
+    </div>
+  </div>
 </div>
 
 <!-- BOTTOM NAV MOBILE -->
@@ -785,12 +829,70 @@ function exportCSV(){
   var a=document.createElement('a');a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);a.download='journal.csv';a.click();
 }
 
-function exportPDF(){
+var _pdfRange='all';
+function openPDFModal(){
   if(!trades.length){alert('Aucun trade \u00E0 exporter.');return;}
-  var closed=trades.filter(function(t){return t.status==='closed';});
-  var all=trades.slice().sort(function(a,b){var da=a.date||'',db=b.date||'';if(da!==db)return db.localeCompare(da);var ta=a.entryTime||a.tp2||'00:00',tb=b.entryTime||b.tp2||'00:00';return ta.localeCompare(tb);});
+  _pdfRange='all';
+  // reset buttons
+  document.querySelectorAll('.pdf-range-btn').forEach(function(b){b.classList.remove('active');});
+  document.querySelector('.pdf-range-btn[data-range="all"]').classList.add('active');
+  document.getElementById('pdf-custom-dates').style.display='none';
+  // default dates = full range
+  var dates=trades.map(function(t){return t.date||'';}).filter(Boolean).sort();
+  if(dates.length){document.getElementById('pdf-date-from').value=dates[0];document.getElementById('pdf-date-to').value=dates[dates.length-1];}
+  updatePDFCount();
+  document.getElementById('pdf-modal').style.display='flex';
+}
+function closePDFModal(){document.getElementById('pdf-modal').style.display='none';}
+function setPDFRange(btn){
+  _pdfRange=btn.getAttribute('data-range');
+  document.querySelectorAll('.pdf-range-btn').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  var today=new Date();
+  if(_pdfRange==='week'){
+    var day=today.getDay()||7;
+    var mon=new Date(today);mon.setDate(today.getDate()-(day-1));
+    var sun=new Date(mon);sun.setDate(mon.getDate()+6);
+    document.getElementById('pdf-date-from').value=mon.toISOString().split('T')[0];
+    document.getElementById('pdf-date-to').value=sun.toISOString().split('T')[0];
+    document.getElementById('pdf-custom-dates').style.display='none';
+  } else if(_pdfRange==='month'){
+    var y=today.getFullYear(),m=today.getMonth();
+    document.getElementById('pdf-date-from').value=new Date(y,m,1).toISOString().split('T')[0];
+    document.getElementById('pdf-date-to').value=new Date(y,m+1,0).toISOString().split('T')[0];
+    document.getElementById('pdf-custom-dates').style.display='none';
+  } else if(_pdfRange==='custom'){
+    document.getElementById('pdf-custom-dates').style.display='flex';
+  } else {
+    var dates=trades.map(function(t){return t.date||'';}).filter(Boolean).sort();
+    if(dates.length){document.getElementById('pdf-date-from').value=dates[0];document.getElementById('pdf-date-to').value=dates[dates.length-1];}
+    document.getElementById('pdf-custom-dates').style.display='none';
+  }
+  updatePDFCount();
+}
+function getPDFTrades(){
+  var from=document.getElementById('pdf-date-from').value;
+  var to=document.getElementById('pdf-date-to').value;
+  return trades.filter(function(t){return t.status==='closed'&&t.date&&t.date>=from&&t.date<=to;});
+}
+function updatePDFCount(){
+  var n=getPDFTrades().length;
+  document.getElementById('pdf-trade-count').textContent=n+' trade'+(n!==1?'s':'')+' dans la p\u00E9riode s\u00E9lectionn\u00E9e';
+}
 
-  // Global stats
+function exportPDF(){
+  var closed=getPDFTrades();
+  if(!closed.length){alert('Aucun trade dans cette p\u00E9riode.');return;}
+  var withPhotos=document.getElementById('pdf-opt-photos').checked;
+  var withErrors=document.getElementById('pdf-opt-errors').checked;
+  var withSummary=document.getElementById('pdf-opt-summary').checked;
+  closePDFModal();
+
+  var from=document.getElementById('pdf-date-from').value;
+  var to=document.getElementById('pdf-date-to').value;
+  var all=closed.slice().sort(function(a,b){var da=a.date||'',db=b.date||'';if(da!==db)return db.localeCompare(da);var ta=a.entryTime||a.tp2||'00:00',tb=b.entryTime||b.tp2||'00:00';return ta.localeCompare(tb);});
+
+  // Stats
   var totalPnl=closed.reduce(function(s,t){return s+(t.pnl||0);},0);
   var totalComm=closed.reduce(function(s,t){return s+(t.commission!=null?t.commission:getCommission(t.symbol,t.lots||t.size||1));},0);
   var totalNet=closed.reduce(function(s,t){return s+(t.commission!=null?(t.netPnl!=null?t.netPnl:t.pnl-(t.commission||0)):(t.pnl||0)-getCommission(t.symbol,t.lots||t.size||1));},0);
@@ -804,66 +906,94 @@ function exportPDF(){
   var gLoss=Math.abs(losses.reduce(function(s,t){return s+t.pnl;},0));
   var pf=gLoss>0?gGain/gLoss:gGain>0?999:0;
 
-  // Error stats
-  var errMap={};closed.forEach(function(t){if(t.error){var e=t.error||'';if(!errMap[e])errMap[e]={count:0,pnl:0};errMap[e].count++;errMap[e].pnl+=(t.pnl||0);}});
-  var errRows='';Object.keys(errMap).sort(function(a,b){return errMap[b].count-errMap[a].count;}).forEach(function(e){errRows+='<tr><td>'+e+'</td><td>'+errMap[e].count+'</td><td style="color:'+(errMap[e].pnl<0?'#e11d48':'#059669')+'">'+( errMap[e].pnl>0?'+':'')+errMap[e].pnl.toFixed(2)+'$</td></tr>';});
+  // Errors
+  var errRows='';
+  if(withErrors){
+    var errMap={};closed.forEach(function(t){if(t.error){if(!errMap[t.error])errMap[t.error]={count:0,pnl:0};errMap[t.error].count++;errMap[t.error].pnl+=(t.pnl||0);}});
+    Object.keys(errMap).sort(function(a,b){return errMap[b].count-errMap[a].count;}).forEach(function(e){errRows+='<tr><td>'+e+'</td><td style="text-align:center">'+errMap[e].count+'</td><td style="color:'+(errMap[e].pnl<0?'#e11d48':'#059669')+'">'+(errMap[e].pnl>0?'+':'')+errMap[e].pnl.toFixed(2)+'$</td></tr>';});
+  }
 
-  // Per-day summaries
+  // Per-day
   var dayMap={};all.forEach(function(t){if(!t.date)return;if(!dayMap[t.date])dayMap[t.date]=[];dayMap[t.date].push(t);});
-  var dayRows='';Object.keys(dayMap).sort().reverse().forEach(function(date){
+  var dayRows='';
+  Object.keys(dayMap).sort().reverse().forEach(function(date){
     var dts=dayMap[date];
     var dNet=dts.reduce(function(s,t){return s+(t.commission!=null?(t.netPnl!=null?t.netPnl:t.pnl-(t.commission||0)):(t.pnl||0)-getCommission(t.symbol,t.lots||t.size||1));},0);
     var dWins=dts.filter(function(t){return t.pnl>0;}).length;
     var dColor=dNet>0?'#059669':'#e11d48';
     var dd=date.split('-').reverse().join('/');
     var sumKey='tj_daysum_'+currentAccount+'_'+date;
-    var sumText=localStorage.getItem(sumKey)||'';
+    var sumText=withSummary?(localStorage.getItem(sumKey)||''):'';
+
+    // Trade rows + photos
     var tradeList=dts.map(function(t){
       var tNet=t.commission!=null?(t.netPnl!=null?t.netPnl:t.pnl-(t.commission||0)):(t.pnl||0)-getCommission(t.symbol,t.lots||t.size||1);
       var tc=t.commission!=null?t.commission:getCommission(t.symbol,t.lots||t.size||1);
-      var errBadge=t.error?'<span style="background:#fef2f2;color:#e11d48;padding:1px 5px;border-radius:3px;font-size:10px;margin-left:4px">\u26A0 '+t.error+'</span>':'';
-      return '<tr><td>'+(t.entryTime||t.tp2||'\u2014')+'</td><td><strong>'+t.symbol+'</strong></td><td>'+(t.side==='BUY'?'Long \u2191':'Short \u2193')+'</td><td>'+(t.lots||t.size||'\u2014')+'</td><td>'+(t.pnl>0?'+':'')+t.pnl.toFixed(2)+'$</td><td style="color:'+( tc>0?'#6b7280':'inherit')+'">-'+tc.toFixed(2)+'$</td><td style="color:'+dColor+';font-weight:600">'+(tNet>0?'+':'')+tNet.toFixed(2)+'$</td><td>'+(t.session||'\u2014')+'</td><td>'+(t.strategy||'\u2014')+'</td><td>'+errBadge+(t.error?'':t.notes||'\u2014')+'</td></tr>';
+      var errCell=t.error?'<span style="background:#fef2f2;color:#e11d48;padding:1px 5px;border-radius:3px;font-size:10px">'+t.error+'</span>':( t.notes||'\u2014');
+      var photoRow='';
+      if(withPhotos&&(t.photo||t.photoExit)){
+        photoRow='<tr><td colspan="10" style="padding:6px 0 8px;background:#f9fafb"><div style="display:flex;gap:8px;align-items:flex-start;padding-left:8px">';
+        if(t.photo)photoRow+='<div style="text-align:center"><img src="'+t.photo+'" style="max-width:280px;max-height:180px;border-radius:4px;border:1px solid #e2e8f0;object-fit:contain"><div style="font-size:9px;color:#94a3b8;margin-top:2px">Entr\u00E9e</div></div>';
+        if(t.photoExit)photoRow+='<div style="text-align:center"><img src="'+t.photoExit+'" style="max-width:280px;max-height:180px;border-radius:4px;border:1px solid #e2e8f0;object-fit:contain"><div style="font-size:9px;color:#94a3b8;margin-top:2px">Sortie</div></div>';
+        photoRow+='</div></td></tr>';
+      }
+      return '<tr style="border-bottom:1px solid #f1f5f9"><td style="padding:5px 7px;white-space:nowrap">'+(t.entryTime||t.tp2||'\u2014')+'</td><td style="padding:5px 7px"><strong>'+t.symbol+'</strong></td><td style="padding:5px 7px">'+(t.side==='BUY'?'<span style="color:#059669">Long \u2191</span>':'<span style="color:#e11d48">Short \u2193</span>')+'</td><td style="padding:5px 7px">'+(t.lots||t.size||'\u2014')+'</td><td style="padding:5px 7px;color:'+(t.pnl>=0?'#059669':'#e11d48')+'">'+(t.pnl>0?'+':'')+t.pnl.toFixed(2)+'$</td><td style="padding:5px 7px;color:#94a3b8;font-size:10px">-'+tc.toFixed(2)+'$</td><td style="padding:5px 7px;font-weight:700;color:'+( tNet>=0?'#059669':'#e11d48')+'">'+(tNet>0?'+':'')+tNet.toFixed(2)+'$</td><td style="padding:5px 7px">'+(t.session||'\u2014')+'</td><td style="padding:5px 7px">'+(t.strategy||'\u2014')+'</td><td style="padding:5px 7px">'+errCell+'</td></tr>'+photoRow;
     }).join('');
-    dayRows+='<div style="margin-bottom:20px;page-break-inside:avoid"><div style="background:#f8f9fa;border-left:4px solid '+(dNet>0?'#059669':'#e11d48')+';padding:8px 14px;display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;border-radius:0 6px 6px 0"><span style="font-weight:700;color:#1e293b">\uD83D\uDCC5 '+dd+'</span><span style="font-size:13px;color:#64748b">'+dts.length+' trades \u2014 '+dWins+'W/'+( dts.length-dWins)+'L</span><span style="font-weight:700;color:'+dColor+';font-size:15px">'+(dNet>0?'+':'')+dNet.toFixed(2)+'$</span></div><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#f1f5f9;color:#475569"><th>Heure</th><th>Actif</th><th>Dir.</th><th>Qt\u00E9</th><th>P&L brut</th><th>Comm.</th><th>Net</th><th>Session</th><th>Strat\u00E9gie</th><th>Note / Erreur</th></tr></thead><tbody>'+tradeList+'</tbody></table>'+(sumText?'<div style="margin-top:6px;padding:6px 10px;background:#fffbeb;border-radius:4px;font-size:11px;color:#78350f;font-style:italic">\uD83D\uDCDD '+sumText+'</div>':'')+'</div>';
+
+    dayRows+='<div style="margin-bottom:22px;page-break-inside:avoid">'
+      +'<div style="background:#f8f9fa;border-left:4px solid '+dColor+';padding:9px 14px;display:flex;justify-content:space-between;align-items:center;border-radius:0 6px 6px 0;margin-bottom:0">'
+      +'<span style="font-weight:700;font-size:13px;color:#1e293b">\uD83D\uDCC5 '+dd+'</span>'
+      +'<span style="font-size:11px;color:#64748b">'+dts.length+' trades \u2014 '+dWins+'W / '+(dts.length-dWins)+'L</span>'
+      +'<span style="font-weight:700;font-size:15px;color:'+dColor+'">'+(dNet>0?'+':'')+dNet.toFixed(2)+'$</span></div>'
+      +'<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#f1f5f9"><th style="padding:5px 7px">Heure</th><th style="padding:5px 7px">Actif</th><th style="padding:5px 7px">Dir.</th><th style="padding:5px 7px">Qt\u00E9</th><th style="padding:5px 7px">P&L brut</th><th style="padding:5px 7px">Comm.</th><th style="padding:5px 7px">Net</th><th style="padding:5px 7px">Session</th><th style="padding:5px 7px">Strat\u00E9gie</th><th style="padding:5px 7px">Note/Erreur</th></tr></thead><tbody>'+tradeList+'</tbody></table>'
+      +(sumText?'<div style="margin-top:6px;padding:7px 12px;background:#fffbeb;border-left:3px solid #f59e0b;border-radius:0 4px 4px 0;font-size:11px;color:#78350f;font-style:italic">\uD83D\uDCDD '+sumText+'</div>':'')
+      +'</div>';
   });
 
   var today=new Date().toLocaleDateString('fr-FR');
   var account=currentAccount||'Mon compte';
-  var html='<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>R\u00E9cap Trading \u2014 '+account+'</title><style>'
-    +'*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#1e293b;padding:24px 32px;background:#fff}'
-    +'h1{font-size:20px;font-weight:700;color:#1e293b;margin-bottom:4px}h2{font-size:14px;font-weight:700;color:#334155;margin:18px 0 8px;border-bottom:1px solid #e2e8f0;padding-bottom:4px}'
-    +'.subtitle{font-size:11px;color:#64748b;margin-bottom:20px}'
-    +'.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}'
-    +'.kpi{background:#f8f9fa;border-radius:6px;padding:10px 14px;border-left:3px solid #6366f1}'
-    +'.kpi-label{font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}'
-    +'.kpi-val{font-size:18px;font-weight:700}'
-    +'.kpi-sub{font-size:10px;color:#94a3b8}'
-    +'table{width:100%;border-collapse:collapse}th{background:#f1f5f9;color:#475569;font-size:10px;padding:5px 7px;text-align:left;font-weight:600}td{padding:4px 7px;border-bottom:1px solid #f1f5f9;font-size:11px}'
-    +'.green{color:#059669}.red{color:#e11d48}'
-    +'@media print{body{padding:10px}@page{margin:15mm;size:A4}}'
-    +'</style></head><body>'
-    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">'
-    +'<div><h1>\uD83D\uDCCA R\u00E9cap Journal de Trading</h1><div class="subtitle">Compte : <strong>'+account+'</strong> &nbsp;\u00B7&nbsp; G\u00E9n\u00E9r\u00E9 le '+today+' &nbsp;\u00B7&nbsp; '+closed.length+' trades cl\u00F4tur\u00E9s</div></div>'
-    +'<div style="text-align:right;font-size:10px;color:#94a3b8">Apex Trader Funding<br>Commissions incluses</div></div>'
+  var periodLabel=from===to?from.split('-').reverse().join('/'):from.split('-').reverse().join('/')+' \u2192 '+to.split('-').reverse().join('/');
 
-    +'<h2>\uD83D\uDCC8 Statistiques globales</h2>'
+  var html='<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>R\u00E9cap Trading \u2014 '+account+' \u2014 '+periodLabel+'</title><style>'
+    +'*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#1e293b;padding:24px 32px;background:#fff}'
+    +'h1{font-size:20px;font-weight:700;color:#1e293b;margin-bottom:4px}'
+    +'h2{font-size:13px;font-weight:700;color:#334155;margin:20px 0 8px;border-bottom:1px solid #e2e8f0;padding-bottom:5px;text-transform:uppercase;letter-spacing:.5px}'
+    +'.subtitle{font-size:11px;color:#64748b;margin-bottom:20px}'
+    +'.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:4px}'
+    +'.kpi{background:#f8f9fa;border-radius:6px;padding:10px 14px;border-left:3px solid #6366f1}'
+    +'.kpi-label{font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}'
+    +'.kpi-val{font-size:18px;font-weight:700;line-height:1.2}'
+    +'.kpi-sub{font-size:9px;color:#94a3b8;margin-top:2px}'
+    +'.green{color:#059669}.red{color:#e11d48}'
+    +'table{width:100%;border-collapse:collapse}'
+    +'th{background:#f1f5f9;color:#475569;font-size:10px;text-align:left;font-weight:600}'
+    +'td{font-size:11px;color:#1e293b}'
+    +'@media print{body{padding:10px}.no-break{page-break-inside:avoid}@page{margin:12mm;size:A4}}'
+    +'</style></head><body>'
+    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;padding-bottom:12px;border-bottom:2px solid #e2e8f0">'
+    +'<div><h1>\uD83D\uDCCA Journal de Trading</h1>'
+    +'<div class="subtitle">Compte : <strong>'+account+'</strong> &nbsp;\u00B7&nbsp; P\u00E9riode : <strong>'+periodLabel+'</strong> &nbsp;\u00B7&nbsp; G\u00E9n\u00E9r\u00E9 le '+today+'</div></div>'
+    +'<div style="text-align:right;font-size:9px;color:#94a3b8;line-height:1.6">Apex Trader Funding<br>Commissions Rithmic incluses</div></div>'
+
+    +'<h2>\uD83D\uDCC8 Statistiques de la p\u00E9riode</h2>'
     +'<div class="kpi-grid">'
-    +'<div class="kpi"><div class="kpi-label">Net P&L</div><div class="kpi-val '+(totalNet>=0?'green':'red')+'">'+(totalNet>=0?'+':'')+totalNet.toFixed(2)+'$</div><div class="kpi-sub">brut '+(totalPnl>=0?'+':'')+totalPnl.toFixed(2)+'$ \u2014 comm -'+totalComm.toFixed(2)+'$</div></div>'
-    +'<div class="kpi"><div class="kpi-label">Win Rate</div><div class="kpi-val '+(wr>=50?'green':'red')+'">'+wr+'%</div><div class="kpi-sub">'+wins.length+'W &nbsp;/&nbsp; '+losses.length+'L</div></div>'
-    +'<div class="kpi"><div class="kpi-label">Profit Factor</div><div class="kpi-val">'+(pf===999?'\u221E':pf.toFixed(2))+'</div><div class="kpi-sub">+'+avgWin.toFixed(2)+'$ avg win</div></div>'
-    +'<div class="kpi"><div class="kpi-label">Risk/Reward</div><div class="kpi-val">'+rr.toFixed(2)+'</div><div class="kpi-sub">avg loss '+avgLoss.toFixed(2)+'$</div></div>'
+    +'<div class="kpi"><div class="kpi-label">Net P&L</div><div class="kpi-val '+(totalNet>=0?'green':'red')+'">'+(totalNet>=0?'+':'')+totalNet.toFixed(2)+'$</div><div class="kpi-sub">brut '+(totalPnl>=0?'+':'')+totalPnl.toFixed(2)+'$ \u00B7 comm -'+totalComm.toFixed(2)+'$</div></div>'
+    +'<div class="kpi"><div class="kpi-label">Win Rate</div><div class="kpi-val '+(wr>=50?'green':'red')+'">'+wr+'%</div><div class="kpi-sub">'+wins.length+'W / '+losses.length+'L sur '+closed.length+' trades</div></div>'
+    +'<div class="kpi"><div class="kpi-label">Profit Factor</div><div class="kpi-val">'+(pf===999?'\u221E':pf.toFixed(2))+'</div><div class="kpi-sub">avg win +'+avgWin.toFixed(2)+'$</div></div>'
+    +'<div class="kpi"><div class="kpi-label">Risk / Reward</div><div class="kpi-val">'+rr.toFixed(2)+'</div><div class="kpi-sub">avg loss -'+avgLoss.toFixed(2)+'$</div></div>'
     +'</div>'
 
-    +(errRows?'<h2>\u26A0\uFE0F Erreurs commises</h2><table><thead><tr><th>Erreur</th><th>Occurences</th><th>Impact P&L</th></tr></thead><tbody>'+errRows+'</tbody></table>':'')
+    +(withErrors&&errRows?'<h2>\u26A0\uFE0F Erreurs commises</h2><table><thead><tr><th style="padding:5px 7px">Erreur</th><th style="padding:5px 7px;text-align:center">Occurrences</th><th style="padding:5px 7px">Impact P&L brut</th></tr></thead><tbody>'+errRows+'</tbody></table>':'')
 
-    +'<h2>\uD83D\uDCC5 D\u00E9tail par jour</h2>'
+    +'<h2>\uD83D\uDCC5 D\u00E9tail par journ\u00E9e</h2>'
     +dayRows
     +'</body></html>';
 
-  var w=window.open('','_blank','width=900,height=700');
+  var w=window.open('','_blank','width=960,height=750');
+  if(!w){alert('Autorise les popups pour g\u00E9n\u00E9rer le PDF.');return;}
   w.document.write(html);
   w.document.close();
-  setTimeout(function(){w.focus();w.print();},600);
+  setTimeout(function(){w.focus();w.print();},700);
 }
 
 function openEditModal(id){
