@@ -160,6 +160,14 @@ tr:hover td{background:var(--bg3)}
 .photo-modal{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.9);display:none;align-items:center;justify-content:center;z-index:9999;cursor:zoom-out}
 .photo-modal.show{display:flex}
 .photo-modal img{max-width:95vw;max-height:90vh;border-radius:8px;object-fit:contain}
+/* COACH */
+.coach-msg{font-size:11px;line-height:1.45;padding:6px 8px;border-radius:6px;display:flex;gap:6px;align-items:flex-start}
+.coach-msg.green{background:rgba(6,214,160,.1);color:#06d6a0;border-left:2px solid #06d6a0}
+.coach-msg.yellow{background:rgba(245,158,11,.1);color:#f59e0b;border-left:2px solid #f59e0b}
+.coach-msg.red{background:rgba(247,37,133,.1);color:#f72585;border-left:2px solid #f72585}
+.coach-msg.blue{background:rgba(59,130,246,.1);color:#3b82f6;border-left:2px solid #3b82f6}
+.coach-msg.neutral{background:var(--bg4);color:var(--text2);border-left:2px solid var(--border)}
+.coach-msg .coach-icon{flex-shrink:0;font-size:13px;margin-top:0px}
 /* DIVIDER */
 .divider{height:1px;background:var(--border);margin:1rem 0}
 /* EMPTY */
@@ -211,6 +219,16 @@ tr:hover td{background:var(--bg3)}
   <div class="nav-item" onclick="showPage('trades',this)"><i class="ti ti-list"></i> Historique</div>
   <div class="nav-item" onclick="showPage('notes',this)"><i class="ti ti-notes"></i> Notes</div>
   <div style="flex:1"></div>
+
+  <!-- COACH PANEL -->
+  <div id="coach-panel" style="margin:0 10px 12px;border-radius:10px;background:var(--bg3);border:1px solid var(--border);overflow:hidden">
+    <div style="padding:8px 12px 6px;display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--border)">
+      <span style="font-size:14px">🧠</span>
+      <span style="font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--text2);text-transform:uppercase">Coach</span>
+      <span id="coach-dot" style="width:7px;height:7px;border-radius:50%;background:var(--text3);margin-left:auto;flex-shrink:0"></span>
+    </div>
+    <div id="coach-messages" style="padding:8px 10px;display:flex;flex-direction:column;gap:5px;max-height:260px;overflow-y:auto"></div>
+  </div>
 </nav>
 
 <!-- MAIN -->
@@ -1244,6 +1262,7 @@ function renderDashboard(){
   var errEl=document.getElementById('error-stats');if(errEl){var ek=Object.keys(errMap).sort(function(a,b){return errMap[b]-errMap[a];});if(!ek.length){errEl.innerHTML='<div style="text-align:center;padding:16px 0"><div style="font-size:28px;margin-bottom:6px">✅</div><div style="font-size:13px;color:var(--text3)">Aucune faute enregistrée</div><div style="font-size:11px;color:var(--text3);margin-top:4px">Remplis le champ "Erreur" sur tes trades perdants</div></div>';}else{var totalErrPnl=ek.reduce(function(s,k){return s+(errPnl[k]||0);},0);var totalErrCount=ek.reduce(function(s,k){return s+errMap[k];},0);var maxCount=errMap[ek[0]]||1;errEl.innerHTML='<div style="display:flex;gap:16px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)"><div style="text-align:center;flex:1"><div style="font-size:22px;font-weight:700;color:var(--red)">'+totalErrCount+'</div><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">fautes total</div></div><div style="text-align:center;flex:1"><div style="font-size:22px;font-weight:700;color:var(--red)">'+(totalErrPnl>0?'+':'')+totalErrPnl.toFixed(0)+'$</div><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">impact cumulé</div></div><div style="text-align:center;flex:1"><div style="font-size:22px;font-weight:700;color:var(--red)">'+ek.length+'</div><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">types d\'erreur</div></div></div>'+ek.map(function(k){var cnt=errMap[k];var imp=errPnl[k]||0;var pct=Math.round(cnt/maxCount*100);var avgImp=cnt>0?imp/cnt:0;return'<div style="margin-bottom:12px;padding:10px;background:rgba(247,37,133,.05);border:1px solid rgba(247,37,133,.15);border-radius:8px"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px"><span style="font-size:12px;font-weight:600;color:var(--text1)">'+k+'</span><span style="font-size:11px;color:var(--red);font-weight:600">'+(imp>0?'+':'')+imp.toFixed(0)+'$</span></div><div style="display:flex;gap:12px;font-size:10px;color:var(--text3);margin-bottom:6px"><span>🔁 '+cnt+'x</span><span>⌀ '+(avgImp>0?'+':'')+avgImp.toFixed(0)+'$/trade</span></div><div style="height:4px;background:var(--bg3);border-radius:2px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:#f72585;border-radius:2px"></div></div></div>';}).join('');}}
 
   renderCalendar();
+  updateCoach();
   checkStopTrade();
 }
 
@@ -1261,6 +1280,126 @@ function buildDayMap(){
   });
   return map;
 }
+
+// ============ COACH PANEL ============
+function updateCoach(){
+  var el=document.getElementById('coach-messages');
+  var dot=document.getElementById('coach-dot');
+  if(!el)return;
+  var trades=getAccountTrades();
+  var closed=trades.filter(function(t){return t.status==='closed';});
+  if(!closed.length){
+    el.innerHTML='<div class="coach-msg neutral"><span class="coach-icon">💤</span><span>Importe des trades pour recevoir des conseils.</span></div>';
+    dot.style.background='var(--text3)';return;
+  }
+
+  // --- stats globales ---
+  var total=closed.length;
+  var wins=closed.filter(function(t){return(t.netPnl!=null?t.netPnl:t.pnl)>0;}).length;
+  var wr=wins/total;
+  var netTotal=closed.reduce(function(s,t){return s+(t.netPnl!=null?t.netPnl:t.pnl||0);},0);
+  var avgWin=0,avgLoss=0,wCount=0,lCount=0;
+  closed.forEach(function(t){var p=t.netPnl!=null?t.netPnl:t.pnl||0;if(p>0){avgWin+=p;wCount++;}else if(p<0){avgLoss+=p;lCount++;}});
+  if(wCount)avgWin/=wCount;if(lCount)avgLoss/=lCount;
+  var rr=lCount&&avgLoss?Math.abs(avgWin/avgLoss):0;
+
+  // --- stats aujourd'hui ---
+  var todayStr=new Date().toISOString().split('T')[0];
+  var todayTrades=closed.filter(function(t){return t.date===todayStr;});
+  var todayNet=todayTrades.reduce(function(s,t){return s+(t.netPnl!=null?t.netPnl:t.pnl||0);},0);
+  var todayErrors=todayTrades.filter(function(t){return t.error&&t.error!=='';}).length;
+  var todayWins=todayTrades.filter(function(t){return(t.netPnl!=null?t.netPnl:t.pnl)>0;}).length;
+  var todayWr=todayTrades.length?todayWins/todayTrades.length:0;
+
+  // --- stats semaine en cours ---
+  var now=new Date();var dow=now.getDay();var mon=new Date(now);
+  mon.setDate(now.getDate()-(dow===0?6:dow-1));mon.setHours(0,0,0,0);
+  var weekTrades=closed.filter(function(t){return t.date&&new Date(t.date)>=mon;});
+  var weekNet=weekTrades.reduce(function(s,t){return s+(t.netPnl!=null?t.netPnl:t.pnl||0);},0);
+  var weekErrors=weekTrades.filter(function(t){return t.error&&t.error!=='';}).length;
+
+  // --- construction des messages ---
+  var msgs=[];
+
+  // Profit Factor global
+  var grossWin=closed.filter(function(t){return(t.pnl||0)>0;}).reduce(function(s,t){return s+(t.pnl||0);},0);
+  var grossLoss=Math.abs(closed.filter(function(t){return(t.pnl||0)<0;}).reduce(function(s,t){return s+(t.pnl||0);},0));
+  var pf=grossLoss>0?grossWin/grossLoss:0;
+
+  // 1. Élan global
+  if(pf>=1.8&&wr>=0.65){
+    msgs.push({type:'green',icon:'🔥',txt:'Super élan — PF '+pf.toFixed(2)+' & WR '+Math.round(wr*100)+'%. Continue sur cette lancée.'});
+  } else if(pf>=1.4&&wr>=0.55){
+    msgs.push({type:'blue',icon:'📈',txt:'Bon rythme global — PF '+pf.toFixed(2)+'. Reste concentré.'});
+  } else if(pf>0&&pf<1.2){
+    msgs.push({type:'red',icon:'⚠️',txt:'PF à '+pf.toFixed(2)+' — tes pertes mangent tes gains. Sois plus sélectif.'});
+  }
+
+  // 2. R/R trop faible
+  if(rr>0&&rr<0.8){
+    msgs.push({type:'yellow',icon:'📐',txt:'R/R à '+rr.toFixed(2)+' — laisse courir tes trades gagnants un peu plus longtemps.'});
+  }
+
+  // 3. Aujourd'hui — volume
+  if(todayTrades.length>=15){
+    msgs.push({type:'red',icon:'🛑',txt:''+todayTrades.length+' trades aujourd\'hui — tu surtrading. Pose-toi.'});
+  } else if(todayTrades.length>=10){
+    msgs.push({type:'yellow',icon:'⏸️',txt:''+todayTrades.length+' trades aujourd\'hui. Proche de la limite, sois sélectif.'});
+  } else if(todayTrades.length>0&&todayTrades.length<=6){
+    msgs.push({type:'green',icon:'✅',txt:''+todayTrades.length+' trades aujourd\'hui — bon rythme, tu restes sélectif.'});
+  }
+
+  // 4. Aujourd'hui — P&L
+  if(todayTrades.length>0){
+    if(todayNet>=150){
+      msgs.push({type:'green',icon:'💰',txt:'Journée +$'+todayNet.toFixed(0)+'. Objectif atteint — protège ce gain.'});
+    } else if(todayNet<=-150){
+      msgs.push({type:'red',icon:'🚨',txt:'Journée -$'+Math.abs(todayNet).toFixed(0)+'. Stop journalier proche — reste calme.'});
+    } else if(todayNet>0){
+      msgs.push({type:'blue',icon:'📊',txt:'Journée +$'+todayNet.toFixed(0)+' pour l\'instant. Continue proprement.'});
+    }
+  }
+
+  // 5. Erreurs aujourd'hui
+  if(todayErrors>=3){
+    msgs.push({type:'red',icon:'❌',txt:todayErrors+' erreurs aujourd\'hui. Arrête-toi, reprends tes règles.'});
+  } else if(todayErrors===2){
+    msgs.push({type:'yellow',icon:'⚠️',txt:'2 erreurs aujourd\'hui. Attention, reste dans tes règles.'});
+  } else if(todayTrades.length>0&&todayErrors===0){
+    msgs.push({type:'green',icon:'🎯',txt:'Zéro erreur aujourd\'hui — execution parfaite !'});
+  }
+
+  // 6. Semaine — erreurs
+  if(weekErrors>=5){
+    msgs.push({type:'yellow',icon:'📋',txt:weekErrors+' erreurs cette semaine. Revois tes critères d\'entrée.'});
+  }
+
+  // 7. Win rate aujourd'hui vs global
+  if(todayTrades.length>=4&&todayWr<0.4){
+    msgs.push({type:'red',icon:'📉',txt:'WR aujourd\'hui à '+Math.round(todayWr*100)+'%. Mauvaise journée — réduis la taille.'});
+  }
+
+  // 8. Semaine positive
+  if(weekTrades.length>0&&weekNet>0&&weekErrors===0){
+    msgs.push({type:'green',icon:'⭐',txt:'Semaine +$'+weekNet.toFixed(0)+' sans erreur. Excellent !'});
+  }
+
+  // fallback
+  if(!msgs.length){
+    msgs.push({type:'neutral',icon:'💡',txt:'Pas assez de données pour aujourd\'hui. Bonne session !'});
+  }
+
+  // couleur du dot
+  var hasRed=msgs.some(function(m){return m.type==='red';});
+  var hasYellow=msgs.some(function(m){return m.type==='yellow';});
+  var hasGreen=msgs.some(function(m){return m.type==='green';});
+  dot.style.background=hasRed?'#f72585':hasYellow?'#f59e0b':hasGreen?'#06d6a0':'#3b82f6';
+
+  el.innerHTML=msgs.map(function(m){
+    return '<div class="coach-msg '+m.type+'"><span class="coach-icon">'+m.icon+'</span><span>'+m.txt+'</span></div>';
+  }).join('');
+}
+// =====================================
 
 function renderCalendar(){
   var el=document.getElementById('calendar-grid');if(!el)return;
@@ -1328,7 +1467,7 @@ function moveTip(e){
 function prevMonth(){calM--;if(calM<0){calM=11;calY--;}renderCalendar();}
 function nextMonth(){calM++;if(calM>11){calM=0;calY++;}renderCalendar();}
 
-renderDashboard();
+renderDashboard();updateCoach();
 
 var authToken=localStorage.getItem('tj_token')||sessionStorage.getItem('tj_token')||null;
 var DEFAULT_ACCOUNTS=[{id:'perso',label:'Perso',icon:'💼'},{id:'apex25k',label:'APEX 25K',icon:'🏆'},{id:'apex50k',label:'APEX 50K',icon:'🏆'},{id:'apex100k',label:'APEX 100K',icon:'🏆'}];
