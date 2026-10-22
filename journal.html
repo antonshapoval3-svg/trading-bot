@@ -1286,7 +1286,6 @@ function updateCoach(){
   var el=document.getElementById('coach-messages');
   var dot=document.getElementById('coach-dot');
   if(!el)return;
-  var trades=getAccountTrades();
   var closed=trades.filter(function(t){return t.status==='closed';});
   if(!closed.length){
     el.innerHTML='<div class="coach-msg neutral"><span class="coach-icon">💤</span><span>Importe des trades pour recevoir des conseils.</span></div>';
