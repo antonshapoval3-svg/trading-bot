@@ -182,6 +182,33 @@ tr:hover td{background:var(--bg3)}
   .bottom-nav{display:block}
   .topbar{padding:10px 14px}
 }
+/* MARCHES */
+.m-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin-bottom:14px}
+.m-note{font-size:12px;color:var(--text3);margin-bottom:14px;line-height:1.5}
+.m-banner{border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:14px;border:1px solid var(--border);background:var(--bg3)}
+.m-banner.warn{background:rgba(247,37,133,.15);border-color:var(--red);color:#ffd3e6;font-weight:600}
+.m-banner.ok{border-color:var(--green)}
+.m-tl{position:relative;height:26px;background:var(--bg3);border-radius:6px;margin-bottom:6px;overflow:hidden}
+.m-tl .bar{position:absolute;top:0;bottom:0;opacity:.85;border-radius:4px}
+.m-tl .now{position:absolute;top:-2px;bottom:-2px;width:2px;background:#fff;z-index:2}
+.m-sess{display:flex;align-items:center;gap:10px;font-size:12px;margin-bottom:8px}
+.m-sess .nm{width:78px;font-weight:600}
+.m-sess .tm{color:var(--text2);width:120px}
+.m-dot{width:9px;height:9px;border-radius:50%;background:var(--text3);display:inline-block}
+.m-dot.on{background:var(--green);box-shadow:0 0 6px var(--green)}
+.m-ev{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px}
+.m-ev.past{opacity:.4}
+.m-ev .t{color:var(--text2);width:52px;flex:none}
+.m-ev .x{margin-left:auto;cursor:pointer;color:var(--text3);flex:none}
+.m-imp{font-size:10px;padding:2px 7px;border-radius:10px;flex:none;text-transform:uppercase}
+.m-imp.haute{background:rgba(247,37,133,.2);color:var(--red)}
+.m-imp.moyenne{background:rgba(245,158,11,.2);color:#f59e0b}
+.m-imp.basse{background:rgba(148,163,184,.15);color:var(--text2)}
+.m-day{font-size:11px;color:var(--purple);text-transform:uppercase;letter-spacing:.6px;margin:12px 0 2px}
+.m-asset{border-left:3px solid var(--purple)}
+.m-asset .row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.m-chk{display:flex;gap:10px;align-items:flex-start;padding:6px 0;font-size:13px;cursor:pointer}
+.m-chk input{margin-top:3px}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -218,6 +245,7 @@ tr:hover td{background:var(--bg3)}
   <div class="nav-item" onclick="showPage('add',this)"><i class="ti ti-plus"></i> Nouveau trade</div>
   <div class="nav-item" onclick="showPage('trades',this)"><i class="ti ti-list"></i> Historique</div>
   <div class="nav-item" onclick="showPage('notes',this)"><i class="ti ti-notes"></i> Notes</div>
+  <div class="nav-item" onclick="showPage('market',this)"><i class="ti ti-world"></i> Marchés</div>
   <div style="flex:1"></div>
 
   <!-- COACH PANEL -->
@@ -420,6 +448,52 @@ tr:hover td{background:var(--bg3)}
       </div>
       <div id="notes-list"></div>
     </div>
+
+    <!-- MARCHES -->
+    <div id="page-market" class="page">
+      <div class="m-note">Préparation de session : horloge des sessions, calendrier économique, tes 4 contrats, régime de marché et checklist. Les données sont saisies à la main ou reprises de l'analyse du 25/10/2026 (Yardeni, TradingKey, RoboForex, StoneX). Il n'y a pas de flux en temps réel : vérifie les heures et les niveaux avant de trader. Toutes les heures sont celles de Budapest.</div>
+      <div class="m-banner" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><i class="ti ti-news"></i><span>Briefing du jour et de la semaine, mis à jour automatiquement :</span><a href="https://claude.ai/artifact/BKBvGpougVW4oZtRSkXKjr" target="_blank" rel="noopener" style="color:var(--blue);font-weight:600">Ouvrir le briefing marchés</a></div>
+      <div id="m-next"></div>
+      <div class="m-grid">
+        <div class="card">
+          <div class="card-title">Sessions de trading <span id="m-clock" style="text-transform:none"></span></div>
+          <div id="m-tl-wrap"></div>
+          <div id="m-sessions"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Régime de marché &amp; sentiment</div>
+          <div class="m-grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:10px">
+            <div class="field"><label>Régime</label><select id="m-reg" onchange="mSet('regime',this.value)"><option value="">—</option><option>Tendance haussière</option><option>Tendance baissière</option><option>Range</option><option>Volatil (annonces)</option><option>Incertain</option></select></div>
+            <div class="field"><label>Sentiment</label><select id="m-sen" onchange="mSet('sentiment',this.value)"><option value="">—</option><option>Risk-on</option><option>Risk-off</option><option>Neutre</option></select></div>
+            <div class="field"><label>Volatilité</label><select id="m-vol" onchange="mSet('vol',this.value)"><option value="">—</option><option>Faible</option><option>Normale</option><option>Élevée</option></select></div>
+          </div>
+          <div id="m-verdict" class="m-banner"></div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-title">Calendrier économique <span style="text-transform:none;color:var(--text3)">heures de Budapest</span></div>
+        <div id="m-cal"></div>
+        <div style="display:grid;grid-template-columns:130px 90px 1fr 120px auto;gap:8px;margin-top:14px;align-items:end">
+          <div class="field"><label>Date</label><input type="date" id="m-ev-day"></div>
+          <div class="field"><label>Heure</label><input type="time" id="m-ev-time"></div>
+          <div class="field"><label>Événement</label><input type="text" id="m-ev-title" placeholder="ex. Discours de Powell"></div>
+          <div class="field"><label>Importance</label><select id="m-ev-imp"><option value="haute">Haute</option><option value="moyenne">Moyenne</option><option value="basse">Basse</option></select></div>
+          <button class="btn primary" onclick="mAddEvent()"><i class="ti ti-plus"></i></button>
+        </div>
+      </div>
+      <div class="card-title" style="margin:6px 2px 10px">Mes 4 contrats</div>
+      <div class="m-grid" id="m-assets"></div>
+      <div class="m-grid">
+        <div class="card">
+          <div class="card-title">Checklist avant session <span id="m-chk-date" style="text-transform:none;color:var(--text3)"></span></div>
+          <div id="m-chk"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Analyse de la semaine</div>
+          <div class="field"><textarea id="m-week" placeholder="Colle ici l'analyse de la semaine ou ton plan..." style="min-height:200px" oninput="market.weekNote=this.value;persistAll()"></textarea></div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -548,6 +622,7 @@ tr:hover td{background:var(--bg3)}
     <button class="bnav-btn" onclick="showPageM('add',this)"><i class="ti ti-plus"></i>Ajouter</button>
     <button class="bnav-btn" onclick="showPageM('trades',this)"><i class="ti ti-list"></i>Trades</button>
     <button class="bnav-btn" onclick="showPageM('notes',this)"><i class="ti ti-notes"></i>Notes</button>
+    <button class="bnav-btn" onclick="showPageM('market',this)"><i class="ti ti-world"></i>Marchés</button>
   </div>
 </nav>
 
@@ -627,7 +702,162 @@ document.getElementById('f-date').value=new Date().toISOString().split('T')[0];
 var sb=localStorage.getItem(balKey());if(sb)document.getElementById('account-balance').value=sb;
 loadTrades();
 
-var PAGE_TITLES={dashboard:'Dashboard',import:'Import CSV',add:'Nouveau trade',trades:'Historique',notes:'Notes'};
+var PAGE_TITLES={dashboard:'Dashboard',import:'Import CSV',add:'Nouveau trade',trades:'Historique',notes:'Notes',market:'Marchés'};
+
+// ===== MARCHES =====
+function defaultMarket(){
+  var E=function(d,t,title,imp){return {id:d+t+title,day:d,time:t,title:title,imp:imp};};
+  return {
+    regime:'',sentiment:'',vol:'',weekNote:'',
+    events:[
+      E('2026-10-27','13:30','Biens durables (sept.)','moyenne'),
+      E('2026-10-27','15:00','Ventes de maisons neuves','basse'),
+      E('2026-10-27','','Élection en Israël (risque pétrole / or)','moyenne'),
+      E('2026-10-28','19:00','FOMC : décision de taux (Fed)','haute'),
+      E('2026-10-28','19:30','Conférence de presse Warsh','haute'),
+      E('2026-10-28','22:15','Alphabet &amp; Microsoft : résultats (après clôture)','haute'),
+      E('2026-10-29','13:30','PIB T3 (1re estimation)','haute'),
+      E('2026-10-29','13:30','Inflation PCE (sept.)','haute'),
+      E('2026-10-29','','BCE : décision (heure à vérifier)','moyenne'),
+      E('2026-10-29','22:15','Amazon &amp; Intel : résultats (après clôture)','haute'),
+      E('2026-10-30','13:30','Coût du travail (ECI T3)','moyenne'),
+      E('2026-10-30','','Exxon &amp; Chevron (avant ouverture) ; BOJ','moyenne'),
+      E('2026-11-03','','Élections américaines (midterms)','haute')
+    ],
+    assets:{
+      MGC:{bias:'Neutre',last:'4 009,5',levels:'Support 3 895 puis 3 675 · Résistance 4 110 puis 4 285 · Veille ≈ 4 036,6 · Chiffre rond 4 000',note:'Range 3 895–4 110 : attendre la cassure. Fed dure ou PCE élevé = pression ; ton moins dur = soutien.'},
+      MCL:{bias:'Neutre',last:'103,43',levels:'Résistance 105 puis proche de 120 · Support 100, 95, 91 · Veille ≈ 100,18',note:'Gap possible (Ormuz, élection Israël le 27, midterms le 3, réserves IEA). Sous 100, risque de retournement.'},
+      MNQ:{bias:'Neutre',last:'29 177',levels:'Veille ≈ 29 033 · Chiffre rond 29 000 · POC et VWAP à lire sur le graphique',note:'Fragile après -4,5 % la semaine du 16/10. Catalyseurs : Fed le 28, Alphabet/Microsoft le 28 au soir, Amazon/Intel le 29 au soir.'},
+      MES:{bias:'Neutre',last:'7 665 – 7 672',levels:'Veille ≈ 7 658 · Chiffres ronds 7 650 / 7 700',note:'Mêmes catalyseurs que le MNQ, en plus calme.'}
+    },
+    checks:{date:'',done:{}}
+  };
+}
+var market=defaultMarket();
+try{var _m=JSON.parse(localStorage.getItem('tj_market')||'null');if(_m)market=Object.assign(defaultMarket(),_m);}catch(e){}
+function mPersist(){try{localStorage.setItem('tj_market',JSON.stringify(market));}catch(e){}}
+var M_CHECKS=['Direction du jour choisie pour MGC, MCL, MNQ, MES','Calendrier du jour vérifié (annonces et heures)','WL Risk Guard démarré (bouton « Démarrer la surveillance »)','Limites rappelées : perte max, nombre de trades, taille max','Pas de trade 15 min avant / après une annonce majeure','Stop fixe en barres WL, aucune entrée en zone rouge'];
+
+function esc(t){return (''+(t==null?'':t)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function mSet(k,v){market[k]=v;mPersist();renderVerdict();}
+
+function tzOffsetMin(tz,d){
+  var f=new Intl.DateTimeFormat('en-US',{timeZone:tz,hourCycle:'h23',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  var p={};f.formatToParts(d).forEach(function(x){p[x.type]=x.value;});
+  var asUTC=Date.UTC(+p.year,+p.month-1,+p.day,+p.hour%24,+p.minute,+p.second);
+  return Math.round((asUTC-Math.floor(d.getTime()/1000)*1000)/60000);
+}
+function localInfo(tz,d){
+  var f=new Intl.DateTimeFormat('en-US',{timeZone:tz,hourCycle:'h23',weekday:'short',hour:'2-digit',minute:'2-digit'});
+  var p={};f.formatToParts(d).forEach(function(x){p[x.type]=x.value;});
+  return {wd:p.weekday,min:(+p.hour%24)*60+(+p.minute)};
+}
+function hhmm(m){m=((m%1440)+1440)%1440;return ('0'+Math.floor(m/60)).slice(-2)+':'+('0'+(m%60)).slice(-2);}
+function budOffsetStr(dayStr){
+  var y=+dayStr.slice(0,4);
+  function lastSun(mo){var d=new Date(Date.UTC(y,mo+1,0));while(d.getUTCDay()!==0)d.setUTCDate(d.getUTCDate()-1);return d;}
+  var start=lastSun(2),end=lastSun(9),cur=new Date(dayStr+'T12:00:00Z');
+  return (cur>=start&&cur<end)?'+02:00':'+01:00';
+}
+function evTs(e){if(!e.time)return null;return new Date(e.day+'T'+e.time+':00'+budOffsetStr(e.day)).getTime();}
+
+var M_SESS=[
+  {n:'Sydney',tz:'Australia/Sydney',o:600,c:960,col:'#f59e0b'},
+  {n:'Tokyo',tz:'Asia/Tokyo',o:540,c:900,col:'#ec4899'},
+  {n:'Londres',tz:'Europe/London',o:480,c:990,col:'#3b82f6'},
+  {n:'New York',tz:'America/New_York',o:570,c:960,col:'#06d6a0'}
+];
+function renderSessions(){
+  var now=new Date(),bud=localInfo('Europe/Budapest',now),offB=tzOffsetMin('Europe/Budapest',now);
+  document.getElementById('m-clock').textContent='Budapest '+hhmm(bud.min);
+  var tl='<div style="font-size:10px;color:var(--text3);display:flex;justify-content:space-between;margin-bottom:3px"><span>00h</span><span>06h</span><span>12h</span><span>18h</span><span>24h</span></div>';
+  var rows='';
+  M_SESS.forEach(function(s){
+    var off=tzOffsetMin(s.tz,now),li=localInfo(s.tz,now);
+    var bo=((s.o-off+offB)%1440+1440)%1440,bc=((s.c-off+offB)%1440+1440)%1440;
+    var open=['Mon','Tue','Wed','Thu','Fri'].indexOf(li.wd)>=0&&li.min>=s.o&&li.min<s.c;
+    var segs=bc>bo?[[bo,bc]]:[[bo,1440],[0,bc]];
+    var bars=segs.map(function(g){return '<div class="bar" style="left:'+(g[0]/14.4)+'%;width:'+((g[1]-g[0])/14.4)+'%;background:'+s.col+'"></div>';}).join('');
+    tl+='<div class="m-tl" title="'+s.n+'">'+bars+'<div class="now" style="left:'+(bud.min/14.4)+'%"></div><span style="position:absolute;left:6px;top:5px;font-size:11px;z-index:3;color:#fff;text-shadow:0 0 3px #000">'+s.n+'</span></div>';
+    rows+='<div class="m-sess"><span class="m-dot'+(open?' on':'')+'"></span><span class="nm">'+s.n+'</span><span class="tm">'+hhmm(bo)+' – '+hhmm(bc)+'</span><span style="color:'+(open?'var(--green)':'var(--text3)')+'">'+(open?'Ouverte':'Fermée')+'</span></div>';
+  });
+  document.getElementById('m-tl-wrap').innerHTML=tl;
+  document.getElementById('m-sessions').innerHTML=rows+'<div class="m-note" style="margin:8px 0 0">Heures de bourse (cash) converties en heure de Budapest. Les futures échangent presque 23 h/jour (réouverture dimanche 23h00).</div>';
+}
+
+function renderNextEvent(){
+  var now=Date.now(),list=market.events.map(function(e){return {e:e,ts:evTs(e)};}).filter(function(x){return x.ts;}).sort(function(a,b){return a.ts-b.ts;});
+  var el=document.getElementById('m-next'),next=null,near=null;
+  list.forEach(function(x){if(!next&&x.ts>now)next=x;if(x.e.imp==='haute'&&Math.abs(x.ts-now)<=15*60000)near=x;});
+  if(near){el.innerHTML='<div class="m-banner warn"><i class="ti ti-alert-triangle"></i> Fenêtre d\'annonce : '+esc(near.e.title).replace(/&amp;amp;/g,'&amp;')+' à '+near.e.time+'. Pas de trade (15 min avant / après).</div>';return;}
+  if(!next){el.innerHTML='<div class="m-banner">Aucun événement à venir : ajoute-en dans le calendrier.</div>';return;}
+  var mins=Math.round((next.ts-now)/60000),txt=mins>=1440?Math.floor(mins/1440)+' j '+Math.floor((mins%1440)/60)+' h':(mins>=60?Math.floor(mins/60)+' h '+(mins%60)+' min':mins+' min');
+  el.innerHTML='<div class="m-banner ok"><i class="ti ti-clock"></i> Prochain événement : <b>'+esc(next.e.title).replace(/&amp;amp;/g,'&amp;')+'</b> ('+next.e.day.slice(8)+'/'+next.e.day.slice(5,7)+' à '+next.e.time+') — dans '+txt+'</div>';
+}
+
+function renderMarketCal(){
+  var DAYS=['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+  var evs=market.events.slice().sort(function(a,b){return (a.day+(a.time||'99:99')).localeCompare(b.day+(b.time||'99:99'));});
+  var h='',cur='',now=Date.now();
+  evs.forEach(function(e){
+    if(e.day!==cur){cur=e.day;var d=new Date(e.day+'T12:00:00Z');h+='<div class="m-day">'+DAYS[d.getUTCDay()]+' '+e.day.slice(8)+'/'+e.day.slice(5,7)+'</div>';}
+    var ts=evTs(e),past=ts?ts<now:e.day<new Date().toISOString().slice(0,10);
+    h+='<div class="m-ev'+(past?' past':'')+'"><span class="t">'+(e.time||'—')+'</span><span class="m-imp '+e.imp+'">'+e.imp+'</span><span>'+(/&amp;/.test(e.title)?e.title:esc(e.title))+'</span><span class="x" onclick="mDelEvent(\''+e.id.replace(/'/g,'')+'\')"><i class="ti ti-x"></i></span></div>';
+  });
+  document.getElementById('m-cal').innerHTML=h||'<div class="m-note">Aucun événement.</div>';
+}
+function mAddEvent(){
+  var d=document.getElementById('m-ev-day').value,t=document.getElementById('m-ev-time').value,ti=document.getElementById('m-ev-title').value.trim(),imp=document.getElementById('m-ev-imp').value;
+  if(!d||!ti)return;
+  market.events.push({id:d+t+ti+Date.now(),day:d,time:t,title:ti,imp:imp});
+  document.getElementById('m-ev-title').value='';
+  mPersist();renderMarketCal();renderNextEvent();
+}
+function mDelEvent(id){market.events=market.events.filter(function(e){return e.id.replace(/'/g,'')!==id;});mPersist();renderMarketCal();renderNextEvent();}
+
+function renderAssets(){
+  var h='';
+  ['MGC','MCL','MNQ','MES'].forEach(function(k){
+    var a=market.assets[k]||{bias:'Neutre',last:'',levels:'',note:''};
+    var col=a.bias==='Haussier'?'var(--green)':a.bias==='Baissier'?'var(--red)':'var(--purple)';
+    h+='<div class="card m-asset" style="border-left-color:'+col+'"><div class="card-title">'+k+' <span style="text-transform:none;color:var(--text3)">futures 12-26</span></div>'+
+    '<div class="row"><div class="field"><label>Dernier prix</label><input value="'+esc(a.last)+'" onchange="mAsset(\''+k+'\',\'last\',this.value)"></div>'+
+    '<div class="field"><label>Direction du jour</label><select onchange="mAsset(\''+k+'\',\'bias\',this.value);renderAssets()">'+['Haussier','Baissier','Neutre','Aucun trade'].map(function(o){return '<option'+(o===a.bias?' selected':'')+'>'+o+'</option>';}).join('')+'</select></div></div>'+
+    '<div class="field" style="margin-bottom:10px"><label>Niveaux clés</label><textarea style="min-height:56px" onchange="mAsset(\''+k+'\',\'levels\',this.value)">'+esc(a.levels)+'</textarea></div>'+
+    '<div class="field"><label>Scénario / notes</label><textarea style="min-height:70px" onchange="mAsset(\''+k+'\',\'note\',this.value)">'+esc(a.note)+'</textarea></div></div>';
+  });
+  document.getElementById('m-assets').innerHTML=h;
+}
+function mAsset(k,f,v){market.assets[k][f]=v;mPersist();}
+
+function renderVerdict(){
+  var r=market.regime,v=market.vol,el=document.getElementById('m-verdict'),msg='Renseigne le régime et la volatilité pour voir la consigne.',cls='m-banner';
+  if(r||v){
+    if(r==='Range'||r==='Incertain'||r==='Volatil (annonces)'||v==='Élevée'){msg='Journée à risque : peu de trades, taille réduite, entrées seulement après cassure confirmée.';cls='m-banner warn';}
+    else if(r){msg='Conditions exploitables : suis la direction choisie et évite les entrées tardives.';cls='m-banner ok';}
+  }
+  el.className=cls;el.textContent=msg;
+}
+
+function renderChecklist(){
+  var today=new Date().toISOString().slice(0,10);
+  if(market.checks.date!==today){market.checks={date:today,done:{}};}
+  document.getElementById('m-chk-date').textContent=today.slice(8)+'/'+today.slice(5,7);
+  document.getElementById('m-chk').innerHTML=M_CHECKS.map(function(t,i){return '<label class="m-chk"><input type="checkbox"'+(market.checks.done[i]?' checked':'')+' onchange="mCheck('+i+',this.checked)"><span>'+esc(t)+'</span></label>';}).join('');
+}
+function mCheck(i,v){market.checks.done[i]=v;mPersist();}
+
+function renderMarket(){
+  renderSessions();renderNextEvent();renderMarketCal();renderAssets();renderChecklist();
+  document.getElementById('m-reg').value=market.regime||'';
+  document.getElementById('m-sen').value=market.sentiment||'';
+  document.getElementById('m-vol').value=market.vol||'';
+  document.getElementById('m-week').value=market.weekNote||'';
+  renderVerdict();
+  var d=document.getElementById('m-ev-day');if(d&&!d.value)d.value=new Date().toISOString().slice(0,10);
+}
+setInterval(function(){var pg=document.getElementById('page-market');if(pg&&pg.classList.contains('active')){renderSessions();renderNextEvent();}},30000);
+
 
 function showPage(p,el){
   document.querySelectorAll('.page').forEach(function(x){x.classList.remove('active');});
@@ -639,6 +869,7 @@ function showPage(p,el){
   if(p==='trades')renderTrades();
   if(p==='notes')renderNotes();
   if(p==='apex')renderApexDashboard();
+  if(p==='market')renderMarket();
 }
 
 function showPageM(p,btn){
