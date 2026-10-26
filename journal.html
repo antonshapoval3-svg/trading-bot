@@ -91,6 +91,11 @@ tr:hover td{background:var(--bg3)}
 /* FILTERS */
 .filters{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;justify-content:space-between}
 .filter-btn{padding:6px 14px;border-radius:6px;font-size:12px;cursor:pointer;border:1px solid var(--border);background:var(--bg3);color:var(--text2);font-family:var(--font)}
+.cdot{display:inline-block;width:12px;height:12px;border-radius:50%;border:2px solid var(--text3);margin-right:7px;vertical-align:-1px;cursor:pointer;box-sizing:border-box}
+.cdot:hover{transform:scale(1.25)}
+.cf{width:20px;height:20px;border-radius:50%;border:2px solid transparent;cursor:pointer;box-sizing:border-box;padding:0}
+.cf.active{border-color:#fff;box-shadow:0 0 0 2px rgba(124,58,237,.6)}
+#cpop{position:fixed;z-index:3000;display:none;gap:6px;padding:8px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.45)}
 .filter-btn.active{background:rgba(124,58,237,.2);color:var(--purple);border-color:rgba(124,58,237,.4)}
 /* DROP ZONE */
 .drop-zone{border:2px dashed var(--border);border-radius:12px;padding:3rem;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg3)}
@@ -453,6 +458,7 @@ tr:hover td{background:var(--bg3)}
           <button class="btn danger" style="font-size:12px;padding:5px 12px" onclick="clearAll()"><i class="ti ti-trash"></i> Tout effacer</button>
         </div>
       </div>
+      <div id="color-bar" style="display:flex;align-items:center;gap:8px;margin:0 0 10px;flex-wrap:wrap"></div>
       <div class="card" style="padding:0;overflow:auto">
         <table><thead><tr>
           <th>Date</th><th>Actif</th><th>Dir.</th><th>Qté</th><th>Entrée</th><th>SL</th><th>TP1</th><th>Heure</th><th>Taille</th><th>P&L</th><th>Net P&L</th><th>Statut</th><th>Stratégie</th><th>Notes</th><th></th>
@@ -556,7 +562,7 @@ tr:hover td{background:var(--bg3)}
       <div class="field"><label>Prix entrée</label><input id="edit-entry" type="number" step="any"></div>
       <div class="field"><label>Stop-Loss</label><input id="edit-sl" type="number" step="any"></div>
       <div class="field"><label>TP1</label><input id="edit-tp" type="number" step="any"></div>
-      <div class="field"><label>TP2</label><input id="edit-tp2" type="number" step="any"></div>
+      <div class="field"><label>Heure entrée</label><input id="edit-tp2" type="text" placeholder="15:32"></div>
       <div class="field"><label>Taille</label><input id="edit-size" type="number" step="any"></div>
       <div class="field"><label>Statut</label><select id="edit-status"><option value="open">Ouvert</option><option value="closed">Fermé</option></select></div>
       <div class="field"><label>P&L ($)</label><input id="edit-pnl" type="number" step="any"></div>
@@ -1133,7 +1139,7 @@ function saveTrade(){
   var pnl=parseFloat(document.getElementById('f-pnl').value)||0;
   var fSize=parseFloat(document.getElementById('f-size').value)||1;
   var fComm=getCommission(symbol,fSize);
-  var t={id:Date.now(),symbol:symbol,side:document.getElementById('f-side').value,date:document.getElementById('f-date').value,entry:parseFloat(document.getElementById('f-entry').value)||0,sl:parseFloat(document.getElementById('f-sl').value)||0,tp:parseFloat(document.getElementById('f-tp').value)||0,tp2:parseFloat(document.getElementById('f-tp2').value)||0,size:fSize,status:document.getElementById('f-status').value,exit:0,pnl:pnl,netPnl:pnl-fComm,commission:fComm,strategy:document.getElementById('f-strategy').value,emotion:document.getElementById('f-emotion').value,error:getErrorValue('f-error','f-error-custom'),session:(document.getElementById('f-session')?document.getElementById('f-session').value:'US'),notes:document.getElementById('f-notes').value};
+  var t={id:Date.now(),symbol:symbol,side:document.getElementById('f-side').value,date:document.getElementById('f-date').value,entry:parseFloat(document.getElementById('f-entry').value)||0,sl:parseFloat(document.getElementById('f-sl').value)||0,tp:parseFloat(document.getElementById('f-tp').value)||0,tp2:(document.getElementById('f-tp2').value||'').trim(),entryTime:(document.getElementById('f-tp2').value||'').trim(),size:fSize,status:document.getElementById('f-status').value,exit:0,pnl:pnl,netPnl:pnl-fComm,commission:fComm,strategy:document.getElementById('f-strategy').value,emotion:document.getElementById('f-emotion').value,error:getErrorValue('f-error','f-error-custom'),session:(document.getElementById('f-session')?document.getElementById('f-session').value:'US'),notes:document.getElementById('f-notes').value};
   var photo=getPhotoData('f-photo-img');if(photo)t.photo=photo;
   t.account=currentAccount;
   apiPost(t).then(function(saved){
@@ -1164,6 +1170,10 @@ function renderTrades(){
   else if(filterMode==='closed')list=trades.filter(function(t){return t.status==='closed';});
   else if(filterMode==='BUY')list=trades.filter(function(t){return t.side==='BUY';});
   else if(filterMode==='SELL')list=trades.filter(function(t){return t.side==='SELL';});
+  if(colorFilter==='any')list=list.filter(function(t){return tColor(t);});
+  else if(colorFilter)list=list.filter(function(t){return tColor(t)===colorFilter;});
+  renderColorBar();
+  list=list.slice();
   list.sort(function(a,b){var da=a.date||'',db=b.date||'';if(da!==db)return db.localeCompare(da);var ta=a.entryTime||a.tp2||'00:00',tb=b.entryTime||b.tp2||'00:00';return ta.localeCompare(tb);});
   if(!list.length){tbody.innerHTML='<tr><td colspan="14" class="empty"><i class="ti ti-database-off" style="font-size:28px;display:block;margin-bottom:8px;opacity:.4"></i>Aucun trade — importe un CSV ou saisis manuellement</td></tr>';return;}
   // Grouper par jour avec séparateurs
@@ -1190,7 +1200,7 @@ function renderTrades(){
       lastDate=t.date;
     }
     var tradeComm=t.commission!=null?t.commission:getCommission(t.symbol,t.lots||t.size||1);
-    var row='<tr><td style="white-space:nowrap">'+t.date+'</td><td><strong>'+t.symbol+'</strong></td><td><span class="badge '+(t.side==='BUY'?'buy':'sell')+'">'+(t.side==='BUY'?'Long':'Short')+'</span></td><td style="color:var(--text2)">'+((t.lots||t.size||t.qty||'—'))+'</td><td>'+(t.entry||'—')+'</td><td style="color:var(--red)">'+(t.sl||'—')+'</td><td style="color:var(--green)">'+(t.tp||'—')+'</td><td style="color:var(--green)">'+(t.tp2||'—')+'</td><td>'+(t.size||1)+'</td><td style="color:'+pnlColor+';font-weight:600">'+(t.pnl>0?'+':'')+(t.pnl?t.pnl.toFixed(2):'—')+'</td><td style="color:'+netColor+';font-weight:600">'+(net>0?'+':'')+(net?net.toFixed(2):'—')+(tradeComm>0?'<br><span style="font-size:9px;color:var(--text3);font-weight:400">comm -'+tradeComm.toFixed(2)+'$</span>':'')+'</td><td><span class="badge '+(isOpen?'open':isWin?'win':'loss')+'">'+(isOpen?'Ouvert':isWin?'Win':'Loss')+'</span></td><td style="font-size:11px;color:var(--text2)">'+(t.strategy||'—')+'</td><td style="font-size:11px;color:var(--text3);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(t.notes||'—')+'</td><td style="white-space:nowrap"><button class="btn btn-edit" data-id="'+ tid +'" style="padding:3px 8px;font-size:11px;margin-right:4px"><i class="ti ti-pencil"></i></button>'+(isOpen?'<button class="btn success btn-close-trade" data-id="'+ tid +'" style="padding:3px 8px;font-size:11px;margin-right:4px"><i class="ti ti-lock"></i></button>':'')+' <button class="btn danger btn-delete" data-id="'+ tid +'" style="padding:3px 8px;font-size:11px"><i class="ti ti-trash"></i></button></td></tr>'
+    var tcol=tColor(t);var row='<tr'+(tcol?' style="background:'+tcol+'1f;box-shadow:inset 3px 0 0 '+tcol+'"':'')+'><td style="white-space:nowrap"><span class="cdot" data-id="'+tid+'" title="Marquer d\'une couleur" style="'+(tcol?'background:'+tcol+';border-color:'+tcol:'')+'"></span>'+t.date+'</td><td><strong>'+t.symbol+'</strong></td><td><span class="badge '+(t.side==='BUY'?'buy':'sell')+'">'+(t.side==='BUY'?'Long':'Short')+'</span></td><td style="color:var(--text2)">'+((t.lots||t.size||t.qty||'—'))+'</td><td>'+(t.entry||'—')+'</td><td style="color:var(--red)">'+(t.sl||'—')+'</td><td style="color:var(--green)">'+(t.tp||'—')+'</td><td style="color:var(--green)">'+(t.tp2||'—')+'</td><td>'+(t.size||1)+'</td><td style="color:'+pnlColor+';font-weight:600">'+(t.pnl>0?'+':'')+(t.pnl?t.pnl.toFixed(2):'—')+'</td><td style="color:'+netColor+';font-weight:600">'+(net>0?'+':'')+(net?net.toFixed(2):'—')+(tradeComm>0?'<br><span style="font-size:9px;color:var(--text3);font-weight:400">comm -'+tradeComm.toFixed(2)+'$</span>':'')+'</td><td><span class="badge '+(isOpen?'open':isWin?'win':'loss')+'">'+(isOpen?'Ouvert':isWin?'Win':'Loss')+'</span></td><td style="font-size:11px;color:var(--text2)">'+(t.strategy||'—')+'</td><td style="font-size:11px;color:var(--text3);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(t.notes||'—')+'</td><td style="white-space:nowrap"><button class="btn btn-edit" data-id="'+ tid +'" style="padding:3px 8px;font-size:11px;margin-right:4px"><i class="ti ti-pencil"></i></button>'+(isOpen?'<button class="btn success btn-close-trade" data-id="'+ tid +'" style="padding:3px 8px;font-size:11px;margin-right:4px"><i class="ti ti-lock"></i></button>':'')+' <button class="btn danger btn-delete" data-id="'+ tid +'" style="padding:3px 8px;font-size:11px"><i class="ti ti-trash"></i></button></td></tr>'
     +(t.photo||t.photoExit?'<tr><td colspan="14" style="padding:4px 10px 8px;background:var(--bg3)"><div style="display:flex;gap:6px;align-items:center">'+(t.photo?'<img src="'+t.photo+'" onclick="showPhotoModal(this.src)" title="Photo entree" style="width:48px;height:36px;object-fit:cover;border-radius:4px;border:1px solid var(--border);cursor:zoom-in;transition:transform .15s" onmouseover="this.style.transform=\'scale(1.08)\'" onmouseout="this.style.transform=\'scale(1)\'">':'')+(t.photoExit?'<img src="'+t.photoExit+'" onclick="showPhotoModal(this.src)" title="Photo sortie" style="width:48px;height:36px;object-fit:cover;border-radius:4px;border:1px solid var(--border);cursor:zoom-in;transition:transform .15s" onmouseover="this.style.transform=\'scale(1.08)\'" onmouseout="this.style.transform=\'scale(1)\'">':'')+'</div></td></tr>':'');
     rows.push(row);
   });
@@ -1215,6 +1225,43 @@ document.addEventListener('click', function(e){
   if(closeBtn){ openCloseModal(closeBtn.getAttribute('data-id')); }
   if(delBtn){ deleteTrade(delBtn.getAttribute('data-id')); }
 });
+
+
+// ===== COULEURS =====
+var T_COLORS=[['#ef4444','Rouge'],['#f97316','Orange'],['#eab308','Jaune'],['#22c55e','Vert'],['#3b82f6','Bleu'],['#a855f7','Violet']];
+var colorFilter='';
+function colorMap(){try{return JSON.parse(localStorage.getItem('tj_colors')||'{}');}catch(e){return {};}}
+function tColor(t){var id=(t.id||t._id||'').toString();return t.color||colorMap()[id]||'';}
+function renderColorBar(){
+  var el=document.getElementById('color-bar');if(!el)return;
+  var h='<span style="font-size:12px;color:var(--text3)">Couleurs :</span><button class="filter-btn'+(colorFilter===''?' active':'')+'" onclick="setColorFilter(\'\')">Toutes</button><button class="filter-btn'+(colorFilter==='any'?' active':'')+'" onclick="setColorFilter(\'any\')">Marqués</button>';
+  T_COLORS.forEach(function(c){var n=trades.filter(function(t){return tColor(t)===c[0];}).length;h+='<button class="cf'+(colorFilter===c[0]?' active':'')+'" title="'+c[1]+' ('+n+')" style="background:'+c[0]+'" onclick="setColorFilter(\''+c[0]+'\')"></button>';});
+  el.innerHTML=h;
+}
+function setColorFilter(c){colorFilter=c;renderTrades();}
+function setTradeColor(id,c){
+  var idx=trades.findIndex(function(t){return (t.id||t._id||'').toString()===id.toString();});if(idx===-1)return;
+  var m=colorMap();if(c)m[id]=c;else delete m[id];
+  try{localStorage.setItem('tj_colors',JSON.stringify(m));}catch(e){}
+  if(c)trades[idx].color=c;else delete trades[idx].color;
+  apiPut(trades[idx].id||trades[idx]._id,trades[idx]).catch(function(e){console.error('Update error:',e);});
+  renderTrades();
+}
+(function(){
+  var pop=document.createElement('div');pop.id='cpop';document.body.appendChild(pop);
+  document.addEventListener('click',function(e){
+    var d=e.target.closest('.cdot');
+    if(d){
+      var id=d.getAttribute('data-id'),h='';
+      T_COLORS.forEach(function(c){h+='<button class="cf" title="'+c[1]+'" style="background:'+c[0]+'" onclick="setTradeColor(\''+id+'\',\''+c[0]+'\');document.getElementById(\'cpop\').style.display=\'none\'"></button>';});
+      h+='<button class="cf" title="Aucune" style="background:var(--bg3);border-color:var(--text3);color:var(--text3);font-size:11px;line-height:14px" onclick="setTradeColor(\''+id+'\',\'\');document.getElementById(\'cpop\').style.display=\'none\'">&times;</button>';
+      pop.innerHTML=h;pop.style.display='flex';
+      var r=d.getBoundingClientRect();pop.style.left=Math.max(8,Math.min(r.left,window.innerWidth-pop.offsetWidth-8))+'px';pop.style.top=(r.bottom+6)+'px';
+      return;
+    }
+    if(!e.target.closest('#cpop'))pop.style.display='none';
+  });
+})();
 
 function deleteTrade(id){
   if(!confirm('Supprimer ce trade ?'))return;
@@ -1446,7 +1493,7 @@ function openEditModal(id){
   document.getElementById('edit-entry').value=t.entry||'';
   document.getElementById('edit-sl').value=t.sl||'';
   document.getElementById('edit-tp').value=t.tp||'';
-  document.getElementById('edit-tp2').value=t.tp2||'';
+  document.getElementById('edit-tp2').value=t.entryTime||(typeof t.tp2==='string'?t.tp2:'')||'';
   document.getElementById('edit-size').value=t.size||1;
   document.getElementById('edit-status').value=t.status||'open';
   document.getElementById('edit-pnl').value=t.pnl||'';
@@ -1483,7 +1530,7 @@ function confirmEdit(){
   var editSym=(document.getElementById('edit-symbol').value||'').toUpperCase().trim();
   var editSize=parseFloat(document.getElementById('edit-size').value)||1;
   var editComm=getCommission(editSym,editSize);
-  trades[idx]=Object.assign({},trades[idx],{symbol:editSym,side:document.getElementById('edit-side').value,date:document.getElementById('edit-date').value,entry:parseFloat(document.getElementById('edit-entry').value)||0,sl:parseFloat(document.getElementById('edit-sl').value)||0,tp:parseFloat(document.getElementById('edit-tp').value)||0,tp2:parseFloat(document.getElementById('edit-tp2').value)||0,size:editSize,status:document.getElementById('edit-status').value,pnl:pnl,netPnl:pnl-editComm,commission:editComm,strategy:document.getElementById('edit-strategy').value,emotion:document.getElementById('edit-emotion').value,error:getErrorValue('edit-error','edit-error-custom'),session:document.getElementById('edit-session').value,notes:document.getElementById('edit-notes').value});
+  trades[idx]=Object.assign({},trades[idx],{symbol:editSym,side:document.getElementById('edit-side').value,date:document.getElementById('edit-date').value,entry:parseFloat(document.getElementById('edit-entry').value)||0,sl:parseFloat(document.getElementById('edit-sl').value)||0,tp:parseFloat(document.getElementById('edit-tp').value)||0,tp2:(document.getElementById('edit-tp2').value||'').trim(),entryTime:(document.getElementById('edit-tp2').value||'').trim(),size:editSize,status:document.getElementById('edit-status').value,pnl:pnl,netPnl:pnl-editComm,commission:editComm,strategy:document.getElementById('edit-strategy').value,emotion:document.getElementById('edit-emotion').value,error:getErrorValue('edit-error','edit-error-custom'),session:document.getElementById('edit-session').value,notes:document.getElementById('edit-notes').value});
   // Save photos — null = unchanged, '' = deleted, 'data:...' = new photo
   if(editPhotoEntry !== null) trades[idx].photo = editPhotoEntry || undefined;
   if(editPhotoExit !== null) trades[idx].photoExit = editPhotoExit || undefined;
