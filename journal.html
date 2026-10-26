@@ -209,6 +209,22 @@ tr:hover td{background:var(--bg3)}
 .m-asset .row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
 .m-chk{display:flex;gap:10px;align-items:flex-start;padding:6px 0;font-size:13px;cursor:pointer}
 .m-chk input{margin-top:3px}
+
+/* ESPERANCE */
+.ex-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px}
+.ex-kpi{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:12px 14px}
+.ex-kpi .l{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.ex-kpi .v{font-size:20px;font-weight:700}
+.ex-kpi .s{font-size:11px;color:var(--text3);margin-top:2px}
+.ex-wrap{overflow-x:auto}
+.ex-tbl{border-collapse:separate;border-spacing:3px;width:100%;min-width:520px;font-size:13px}
+.ex-tbl th{font-size:11px;color:var(--text3);font-weight:500;padding:6px 4px;text-align:center}
+.ex-tbl td{text-align:center;padding:10px 4px;border-radius:6px;font-weight:600;font-variant-numeric:tabular-nums}
+.ex-tbl td.me{outline:2px solid #fff;outline-offset:-2px}
+.ex-tbl th.rowh{text-align:right;padding-right:8px;color:var(--text2)}
+.ex-msg{border-radius:10px;padding:12px 14px;font-size:13px;line-height:1.55;margin-bottom:14px;border:1px solid var(--border);background:var(--bg3)}
+.ex-msg.ok{border-color:var(--green)}.ex-msg.warn{border-color:#f59e0b}.ex-msg.bad{border-color:var(--red)}
+.ex-sim{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:12px}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -246,6 +262,7 @@ tr:hover td{background:var(--bg3)}
   <div class="nav-item" onclick="showPage('trades',this)"><i class="ti ti-list"></i> Historique</div>
   <div class="nav-item" onclick="showPage('notes',this)"><i class="ti ti-notes"></i> Notes</div>
   <div class="nav-item" onclick="showPage('market',this)"><i class="ti ti-world"></i> Marchés</div>
+  <div class="nav-item" onclick="showPage('expect',this)"><i class="ti ti-table"></i> Espérance de gain</div>
   <div style="flex:1"></div>
 
   <!-- COACH PANEL -->
@@ -494,6 +511,31 @@ tr:hover td{background:var(--bg3)}
         </div>
       </div>
     </div>
+
+    <!-- ESPERANCE -->
+    <div id="page-expect" class="page">
+      <div class="m-note">Gain moyen par trade selon ton taux de réussite et ton ratio gain/risque. Formule : réussite × ratio − (1 − réussite). Les valeurs du tableau sont en R (1 R = ce que tu risques sur un trade). Tes chiffres viennent des trades clôturés du compte sélectionné.</div>
+      <div id="ex-me"></div>
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-title">Tableau d'espérance <span style="text-transform:none;color:var(--text3)">case blanche = ta position actuelle</span></div>
+        <div class="ex-sim" style="grid-template-columns:200px 1fr;align-items:end">
+          <div class="field"><label>Affichage</label><select id="ex-mode" onchange="renderExpect()"><option value="R">En R (par trade)</option><option value="$">En $ (par trade)</option></select></div>
+          <div class="field"><label>Risque par trade ($), utilisé pour l'affichage en $ et le simulateur</label><input type="number" id="ex-risk" min="1" step="1" onchange="exSaveRisk()"></div>
+        </div>
+        <div class="ex-wrap"><table class="ex-tbl" id="ex-tbl"></table></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Simulateur</div>
+        <div class="ex-sim">
+          <div class="field"><label>Taux de réussite (%)</label><input type="number" id="sim-wr" min="1" max="99" step="1" oninput="renderSim()"></div>
+          <div class="field"><label>Ratio gain/risque</label><input type="number" id="sim-rr" min="0.1" step="0.1" oninput="renderSim()"></div>
+          <div class="field"><label>Risque par trade ($)</label><input type="number" id="sim-risk" min="1" step="1" oninput="renderSim()"></div>
+          <div class="field"><label>Nombre de trades</label><input type="number" id="sim-n" min="1" step="1" value="100" oninput="renderSim()"></div>
+        </div>
+        <div class="ex-grid" id="sim-out"></div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -623,6 +665,7 @@ tr:hover td{background:var(--bg3)}
     <button class="bnav-btn" onclick="showPageM('trades',this)"><i class="ti ti-list"></i>Trades</button>
     <button class="bnav-btn" onclick="showPageM('notes',this)"><i class="ti ti-notes"></i>Notes</button>
     <button class="bnav-btn" onclick="showPageM('market',this)"><i class="ti ti-world"></i>Marchés</button>
+    <button class="bnav-btn" onclick="showPageM('expect',this)"><i class="ti ti-table"></i>Espérance</button>
   </div>
 </nav>
 
@@ -702,7 +745,7 @@ document.getElementById('f-date').value=new Date().toISOString().split('T')[0];
 var sb=localStorage.getItem(balKey());if(sb)document.getElementById('account-balance').value=sb;
 loadTrades();
 
-var PAGE_TITLES={dashboard:'Dashboard',import:'Import CSV',add:'Nouveau trade',trades:'Historique',notes:'Notes',market:'Marchés'};
+var PAGE_TITLES={dashboard:'Dashboard',import:'Import CSV',add:'Nouveau trade',trades:'Historique',notes:'Notes',market:'Marchés',expect:'Espérance de gain'};
 
 // ===== MARCHES =====
 function defaultMarket(){
@@ -859,6 +902,80 @@ function renderMarket(){
 setInterval(function(){var pg=document.getElementById('page-market');if(pg&&pg.classList.contains('active')){renderSessions();renderNextEvent();}},30000);
 
 
+
+// ===== ESPERANCE =====
+var EX_WR=[80,75,70,65,60,55,50,45,40,35,30];
+var EX_RR=[0.5,1,1.5,2,2.5,3,4];
+function exStats(){
+  var closed=trades.filter(function(t){return t.status==='closed';});
+  var wins=closed.filter(function(t){return t.pnl>0;}),losses=closed.filter(function(t){return t.pnl<0;});
+  var n=closed.length,w=n?wins.length/n:0;
+  var aw=wins.length?wins.reduce(function(s,t){return s+t.pnl;},0)/wins.length:0;
+  var al=losses.length?Math.abs(losses.reduce(function(s,t){return s+t.pnl;},0)/losses.length):0;
+  var rr=al?aw/al:0;
+  return {n:n,w:w,aw:aw,al:al,rr:rr,e$:w*aw-(1-w)*al,eR:al?(w*aw-(1-w)*al)/al:0,be:rr?1/(1+rr):null};
+}
+function exCol(v,max){var a=Math.min(1,Math.abs(v)/max);return v>=0?'rgba(6,214,160,'+(0.15+0.55*a)+')':'rgba(247,37,133,'+(0.15+0.55*a)+')';}
+function exFmt(v,d){return (v>=0?'+':'')+v.toFixed(d);}
+function exRisk(){var r=parseFloat(document.getElementById('ex-risk').value);return r>0?r:100;}
+function exSaveRisk(){try{localStorage.setItem('tj_exrisk',document.getElementById('ex-risk').value);}catch(e){}renderExpect();renderSim();}
+function renderExpect(){
+  var st=exStats(),riskEl=document.getElementById('ex-risk');
+  if(!riskEl.value){var sv=null;try{sv=localStorage.getItem('tj_exrisk');}catch(e){}riskEl.value=sv||(st.al?Math.round(st.al):100);}
+  var risk=exRisk(),mode=document.getElementById('ex-mode').value;
+  // bloc "tes chiffres"
+  var me=document.getElementById('ex-me');
+  if(!st.n||!st.al||!st.aw){me.innerHTML='<div class="ex-msg">Pas assez de trades clôturés (au moins un gagnant et un perdant) pour calculer tes chiffres sur ce compte.</div>';}
+  else{
+    var margin=(st.w-st.be)*100,cls=margin>=15?'ok':margin>=5?'warn':'bad';
+    var e1=st.w*1-(1-st.w)*1;
+    var txt='Tu gagnes en moyenne <b>'+exFmt(st.e$,2)+' $ par trade</b> ('+exFmt(st.eR,2)+' R). ';
+    txt+='Ton point mort est à <b>'+(st.be*100).toFixed(0)+' %</b> de réussite ; tu es à '+(st.w*100).toFixed(0)+' %, soit une marge de '+margin.toFixed(0)+' points. ';
+    if(st.rr<1)txt+='Tes pertes moyennes ('+st.al.toFixed(2)+' $) dépassent tes gains moyens ('+st.aw.toFixed(2)+' $) : tu dépends entièrement du taux de réussite. ';
+    txt+='À taux de réussite égal avec un ratio de 1,0, tu ferais '+exFmt(e1*st.al,2)+' $ par trade.';
+    me.innerHTML='<div class="ex-grid">'+
+     '<div class="ex-kpi"><div class="l">Trades clôturés</div><div class="v">'+st.n+'</div></div>'+
+     '<div class="ex-kpi"><div class="l">Réussite</div><div class="v">'+(st.w*100).toFixed(0)+' %</div></div>'+
+     '<div class="ex-kpi"><div class="l">Gain moyen</div><div class="v" style="color:var(--green)">+'+st.aw.toFixed(2)+' $</div></div>'+
+     '<div class="ex-kpi"><div class="l">Perte moyenne</div><div class="v" style="color:var(--red)">-'+st.al.toFixed(2)+' $</div></div>'+
+     '<div class="ex-kpi"><div class="l">Ratio gain/risque réel</div><div class="v">'+st.rr.toFixed(2)+'</div></div>'+
+     '<div class="ex-kpi"><div class="l">Espérance par trade</div><div class="v" style="color:'+(st.e$>=0?'var(--green)':'var(--red)')+'">'+exFmt(st.e$,2)+' $</div><div class="s">'+exFmt(st.eR,2)+' R</div></div>'+
+     '<div class="ex-kpi"><div class="l">Point mort</div><div class="v">'+(st.be*100).toFixed(0)+' %</div><div class="s">réussite minimale</div></div>'+
+     '</div><div class="ex-msg '+cls+'">'+txt+'</div>';
+  }
+  // tableau
+  var myRow=null,myCol=null;
+  if(st.n&&st.rr){
+    var bd=1e9;EX_WR.forEach(function(w){var d=Math.abs(w-st.w*100);if(d<bd){bd=d;myRow=w;}});
+    bd=1e9;EX_RR.forEach(function(r){var d=Math.abs(r-st.rr);if(d<bd){bd=d;myCol=r;}});
+  }
+  var h='<tr><th></th>'+EX_RR.map(function(r){return '<th>R:R '+r+'</th>';}).join('')+'</tr>';
+  EX_WR.forEach(function(w){
+    h+='<tr><th class="rowh">'+w+' %</th>';
+    EX_RR.forEach(function(r){
+      var e=w/100*r-(1-w/100),val=mode==='R'?e:e*risk;
+      h+='<td'+(w===myRow&&r===myCol?' class="me"':'')+' style="background:'+exCol(e,3)+'">'+(mode==='R'?exFmt(val,2):exFmt(val,0)+'$')+'</td>';
+    });
+    h+='</tr>';
+  });
+  document.getElementById('ex-tbl').innerHTML=h;
+  // valeurs par défaut du simulateur
+  var sw=document.getElementById('sim-wr');
+  if(!sw.value){sw.value=st.n?Math.round(st.w*100):50;document.getElementById('sim-rr').value=st.rr?st.rr.toFixed(2):'1.5';document.getElementById('sim-risk').value=risk;}
+  renderSim();
+}
+function renderSim(){
+  var w=parseFloat(document.getElementById('sim-wr').value)/100,rr=parseFloat(document.getElementById('sim-rr').value),risk=parseFloat(document.getElementById('sim-risk').value),n=parseInt(document.getElementById('sim-n').value,10);
+  var out=document.getElementById('sim-out');
+  if(!(w>0&&w<1&&rr>0&&risk>0&&n>0)){out.innerHTML='';return;}
+  var e=w*rr-(1-w),be=1/(1+rr),streak=Math.log(n)/Math.log(1/(1-w));
+  out.innerHTML=
+   '<div class="ex-kpi"><div class="l">Espérance par trade</div><div class="v" style="color:'+(e>=0?'var(--green)':'var(--red)')+'">'+exFmt(e,2)+' R</div><div class="s">'+exFmt(e*risk,2)+' $</div></div>'+
+   '<div class="ex-kpi"><div class="l">Sur '+n+' trades</div><div class="v" style="color:'+(e>=0?'var(--green)':'var(--red)')+'">'+exFmt(e*risk*n,0)+' $</div></div>'+
+   '<div class="ex-kpi"><div class="l">Point mort</div><div class="v">'+(be*100).toFixed(0)+' %</div><div class="s">réussite minimale</div></div>'+
+   '<div class="ex-kpi"><div class="l">Série de pertes typique</div><div class="v">≈ '+Math.round(streak)+'</div><div class="s">de suite, sur '+n+' trades</div></div>';
+}
+
 function showPage(p,el){
   document.querySelectorAll('.page').forEach(function(x){x.classList.remove('active');});
   document.querySelectorAll('.nav-item').forEach(function(x){x.classList.remove('active');});
@@ -870,6 +987,7 @@ function showPage(p,el){
   if(p==='notes')renderNotes();
   if(p==='apex')renderApexDashboard();
   if(p==='market')renderMarket();
+  if(p==='expect')renderExpect();
 }
 
 function showPageM(p,btn){
