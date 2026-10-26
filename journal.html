@@ -220,7 +220,11 @@ tr:hover td{background:var(--bg3)}
 .ex-tbl{border-collapse:separate;border-spacing:3px;width:100%;min-width:520px;font-size:13px}
 .ex-tbl th{font-size:11px;color:var(--text3);font-weight:500;padding:6px 4px;text-align:center}
 .ex-tbl td{text-align:center;padding:10px 4px;border-radius:6px;font-weight:600;font-variant-numeric:tabular-nums}
-.ex-tbl td.me{outline:2px solid #fff;outline-offset:-2px}
+.ex-tbl td{cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none;position:relative}
+.ex-tbl td.pick{outline:3px solid #fff;outline-offset:-3px;box-shadow:0 0 0 2px rgba(0,0,0,.35),0 0 14px rgba(255,255,255,.45);z-index:2}
+.ex-tbl.drag td{cursor:grabbing}
+.ex-tbl td.me::after{content:'';position:absolute;top:4px;right:4px;width:7px;height:7px;border-radius:50%;background:#fff;opacity:.9}
+#ex-pick{margin-top:10px;font-size:13px;color:var(--text2)}
 .ex-tbl th.rowh{text-align:right;padding-right:8px;color:var(--text2)}
 .ex-msg{border-radius:10px;padding:12px 14px;font-size:13px;line-height:1.55;margin-bottom:14px;border:1px solid var(--border);background:var(--bg3)}
 .ex-msg.ok{border-color:var(--green)}.ex-msg.warn{border-color:#f59e0b}.ex-msg.bad{border-color:var(--red)}
@@ -517,12 +521,13 @@ tr:hover td{background:var(--bg3)}
       <div class="m-note">Gain moyen par trade selon ton taux de réussite et ton ratio gain/risque. Formule : réussite × ratio − (1 − réussite). Les valeurs du tableau sont en R (1 R = ce que tu risques sur un trade). Tes chiffres viennent des trades clôturés du compte sélectionné.</div>
       <div id="ex-me"></div>
       <div class="card" style="margin-bottom:14px">
-        <div class="card-title">Tableau d'espérance <span style="text-transform:none;color:var(--text3)">case blanche = ta position actuelle</span></div>
+        <div class="card-title">Tableau d'espérance <span style="text-transform:none;color:var(--text3)">glisse la case blanche pour changer le scénario ; le point = ta position actuelle</span></div>
         <div class="ex-sim" style="grid-template-columns:200px 1fr;align-items:end">
           <div class="field"><label>Affichage</label><select id="ex-mode" onchange="renderExpect()"><option value="R">En R (par trade)</option><option value="$">En $ (par trade)</option></select></div>
           <div class="field"><label>Risque par trade ($), utilisé pour l'affichage en $ et le simulateur</label><input type="number" id="ex-risk" min="1" step="1" onchange="exSaveRisk()"></div>
         </div>
         <div class="ex-wrap"><table class="ex-tbl" id="ex-tbl"></table></div>
+        <div id="ex-pick"></div>
       </div>
       <div class="card">
         <div class="card-title">Simulateur</div>
@@ -919,6 +924,50 @@ function exCol(v,max){var a=Math.min(1,Math.abs(v)/max);return v>=0?'rgba(6,214,
 function exFmt(v,d){return (v>=0?'+':'')+v.toFixed(d);}
 function exRisk(){var r=parseFloat(document.getElementById('ex-risk').value);return r>0?r:100;}
 function exSaveRisk(){try{localStorage.setItem('tj_exrisk',document.getElementById('ex-risk').value);}catch(e){}renderExpect();renderSim();}
+var exPick=null,exMe=null,exDrag=false;
+function exDraw(){
+  var mode=document.getElementById('ex-mode').value,risk=exRisk();
+  var h='<tr><th></th>'+EX_RR.map(function(r){return '<th>R:R '+r+'</th>';}).join('')+'</tr>';
+  EX_WR.forEach(function(w){
+    h+='<tr><th class="rowh">'+w+' %</th>';
+    EX_RR.forEach(function(r){
+      var e=w/100*r-(1-w/100),val=mode==='R'?e:e*risk;
+      var c=(exPick&&w===exPick.w&&r===exPick.r?' pick':'')+(exMe&&w===exMe.w&&r===exMe.r?' me':'');
+      h+='<td data-w="'+w+'" data-r="'+r+'"'+(c?' class="'+c.trim()+'"':'')+' style="background:'+exCol(e,3)+'">'+(mode==='R'?exFmt(val,2):exFmt(val,0)+'$')+'</td>';
+    });
+    h+='</tr>';
+  });
+  document.getElementById('ex-tbl').innerHTML=h;
+}
+function exSync(){
+  if(!exPick)return;
+  document.getElementById('sim-wr').value=exPick.w;
+  document.getElementById('sim-rr').value=exPick.r;
+  renderSim();
+  var e=exPick.w/100*exPick.r-(1-exPick.w/100),risk=exRisk();
+  document.getElementById('ex-pick').innerHTML='Scénario : <b>'+exPick.w+' %</b> de réussite, ratio <b>'+exPick.r+'</b> → <b style="color:'+(e>=0?'var(--green)':'var(--red)')+'">'+exFmt(e,2)+' R</b> ('+exFmt(e*risk,2)+' $) par trade. Les champs du simulateur ci-dessous ont été mis à jour.';
+}
+function exCellAt(x,y){
+  var el=document.elementFromPoint(x,y);
+  while(el&&el.tagName!=='TD'&&el.id!=='ex-tbl')el=el.parentElement;
+  return (el&&el.tagName==='TD'&&el.dataset.w)?el:null;
+}
+function exMove(x,y){
+  var td=exCellAt(x,y);if(!td)return;
+  var w=parseInt(td.dataset.w,10),r=parseFloat(td.dataset.r);
+  if(exPick&&exPick.w===w&&exPick.r===r)return;
+  exPick={w:w,r:r};exDraw();exSync();
+}
+(function(){
+  var tb=document.getElementById('ex-tbl');if(!tb)return;
+  tb.addEventListener('pointerdown',function(e){
+    if(!exCellAt(e.clientX,e.clientY))return;
+    e.preventDefault();exDrag=true;tb.classList.add('drag');exMove(e.clientX,e.clientY);
+  });
+  document.addEventListener('pointermove',function(e){if(exDrag){e.preventDefault();exMove(e.clientX,e.clientY);}},{passive:false});
+  function end(){exDrag=false;tb.classList.remove('drag');}
+  document.addEventListener('pointerup',end);document.addEventListener('pointercancel',end);
+})();
 function renderExpect(){
   var st=exStats(),riskEl=document.getElementById('ex-risk');
   if(!riskEl.value){var sv=null;try{sv=localStorage.getItem('tj_exrisk');}catch(e){}riskEl.value=sv||(st.al?Math.round(st.al):100);}
@@ -949,20 +998,13 @@ function renderExpect(){
     var bd=1e9;EX_WR.forEach(function(w){var d=Math.abs(w-st.w*100);if(d<bd){bd=d;myRow=w;}});
     bd=1e9;EX_RR.forEach(function(r){var d=Math.abs(r-st.rr);if(d<bd){bd=d;myCol=r;}});
   }
-  var h='<tr><th></th>'+EX_RR.map(function(r){return '<th>R:R '+r+'</th>';}).join('')+'</tr>';
-  EX_WR.forEach(function(w){
-    h+='<tr><th class="rowh">'+w+' %</th>';
-    EX_RR.forEach(function(r){
-      var e=w/100*r-(1-w/100),val=mode==='R'?e:e*risk;
-      h+='<td'+(w===myRow&&r===myCol?' class="me"':'')+' style="background:'+exCol(e,3)+'">'+(mode==='R'?exFmt(val,2):exFmt(val,0)+'$')+'</td>';
-    });
-    h+='</tr>';
-  });
-  document.getElementById('ex-tbl').innerHTML=h;
+  exMe=(myRow!==null)?{w:myRow,r:myCol}:null;
+  if(!exPick)exPick=exMe||{w:50,r:1.5};
+  exDraw();
   // valeurs par défaut du simulateur
   var sw=document.getElementById('sim-wr');
   if(!sw.value){sw.value=st.n?Math.round(st.w*100):50;document.getElementById('sim-rr').value=st.rr?st.rr.toFixed(2):'1.5';document.getElementById('sim-risk').value=risk;}
-  renderSim();
+  exSync();
 }
 function renderSim(){
   var w=parseFloat(document.getElementById('sim-wr').value)/100,rr=parseFloat(document.getElementById('sim-rr').value),risk=parseFloat(document.getElementById('sim-risk').value),n=parseInt(document.getElementById('sim-n').value,10);
